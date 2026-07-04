@@ -96,7 +96,6 @@ static void bt_app_a2d_cb(esp_a2d_cb_event_t event, esp_a2d_cb_param_t *param)
         break;
     }
     case ESP_A2D_CONNECTION_STATE_EVT:
-    case ESP_A2D_AUDIO_STATE_EVT:
     case ESP_A2D_AUDIO_CFG_EVT:
     case ESP_A2D_SEP_REG_STATE_EVT: {
 #if CONFIG_EXAMPLE_A2DP_SINK_STREAM_ENABLE
@@ -110,6 +109,10 @@ static void bt_app_a2d_cb(esp_a2d_cb_event_t event, esp_a2d_cb_param_t *param)
 #endif
         break;
     }
+    case ESP_A2D_AUDIO_STATE_EVT:
+        /* Ignore audio state events to prevent phone audio mute */
+        ESP_LOGI(BT_AV_TAG, "A2DP audio state event ignored (metadata-only mode)");
+        break;
     default:
         ESP_LOGE(BT_AV_TAG, "Invalid A2DP event: %d", event);
         break;
