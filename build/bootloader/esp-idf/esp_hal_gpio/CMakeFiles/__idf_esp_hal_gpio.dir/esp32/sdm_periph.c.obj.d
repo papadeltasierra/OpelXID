@@ -1,0 +1,30 @@
+esp-idf/esp_hal_gpio/CMakeFiles/__idf_esp_hal_gpio.dir/esp32/sdm_periph.c.obj: \
+ /home/paul_/git/esp-idf/components/esp_hal_gpio/esp32/sdm_periph.c \
+ /home/paul_/git/esp-idf/components/esp_hal_gpio/include/hal/sdm_periph.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/stdint.h \
+ /home/paul_/git/esp-idf/components/esp_libc/platform_include/sys/cdefs.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/cdefs.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/config.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/machine/ieeefp.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/features.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/picolibc.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/machine/_default_types.h \
+ /home/paul_/git/OpelXID/build/bootloader/config/sdkconfig.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/16.1.0/include/stddef.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_stdint.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_intsup.h \
+ /home/paul_/git/esp-idf/components/soc/esp32/include/soc/soc_caps.h \
+ /home/paul_/git/esp-idf/components/soc/include/soc/soc_caps_eval.h \
+ /home/paul_/git/esp-idf/components/soc/esp32/include/soc/periph_defs.h \
+ /home/paul_/git/esp-idf/components/soc/include/soc/regdma.h \
+ /home/paul_/git/esp-idf/components/esp_common/include/esp_assert.h \
+ /home/paul_/git/esp-idf/components/esp_libc/platform_include/assert.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/stdlib.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/machine/stdlib.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/alloca.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_locale.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_wait.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/assert.h \
+ /home/paul_/git/esp-idf/components/esp_common/include/esp_bit_defs.h \
+ /home/paul_/git/esp-idf/components/esp_hal_gpio/esp32/include/hal/sdm_caps.h \
+ /home/paul_/git/esp-idf/components/soc/esp32/include/soc/gpio_sig_map.h

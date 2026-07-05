@@ -1,0 +1,31 @@
+esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/port/esp_tinycrypt_port.c.obj: \
+ /home/paul_/git/esp-idf/components/bt/common/tinycrypt/port/esp_tinycrypt_port.c \
+ /home/paul_/git/esp-idf/components/bt/common/tinycrypt/port/esp_tinycrypt_port.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/stdint.h \
+ /home/paul_/git/esp-idf/components/esp_libc/platform_include/sys/cdefs.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/cdefs.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/config.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/machine/ieeefp.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/features.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/picolibc.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/machine/_default_types.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/16.1.0/include/stddef.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_stdint.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_intsup.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/16.1.0/include/stdbool.h \
+ /home/paul_/git/esp-idf/components/soc/esp32/include/soc/soc_caps.h \
+ /home/paul_/git/esp-idf/components/soc/include/soc/soc_caps_eval.h \
+ /home/paul_/git/esp-idf/components/esp_security/include/esp_crypto_lock.h \
+ /home/paul_/git/esp-idf/components/esp_hw_support/include/esp_private/esp_crypto_lock_internal.h \
+ /home/paul_/git/esp-idf/components/esp_hw_support/include/esp_private/periph_ctrl.h \
+ /home/paul_/git/esp-idf/components/soc/esp32/include/soc/periph_defs.h \
+ /home/paul_/git/OpelXID/build/config/libc/picolibc/newlib/compatibility.cdep \
+ /home/paul_/git/OpelXID/build/config/esp32/rev/min/full.cdep \
+ /home/paul_/git/OpelXID/build/config/idf/target/esp32.cdep \
+ /home/paul_/git/OpelXID/build/config/idf/target/esp32s2.cdep \
+ /home/paul_/git/OpelXID/build/config/idf/target/esp32s3.cdep \
+ /home/paul_/git/OpelXID/build/config/idf/target/esp32c2.cdep \
+ /home/paul_/git/OpelXID/build/config/idf/target/esp32c3.cdep \
+ /home/paul_/git/OpelXID/build/config/idf/target/esp32c6.cdep \
+ /home/paul_/git/OpelXID/build/config/idf/target/esp32h2.cdep \
+ /home/paul_/git/OpelXID/build/config/idf/target.cdep

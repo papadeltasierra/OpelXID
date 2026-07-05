@@ -1,0 +1,2 @@
+/home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/bin/xtensa-esp32-elf-ar qc libp256-m.a "CMakeFiles/p256-m.dir/p256-m_driver_entrypoints.c.obj" "CMakeFiles/p256-m.dir/p256-m/p256-m.c.obj"
+/home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/bin/xtensa-esp32-elf-ranlib libp256-m.a

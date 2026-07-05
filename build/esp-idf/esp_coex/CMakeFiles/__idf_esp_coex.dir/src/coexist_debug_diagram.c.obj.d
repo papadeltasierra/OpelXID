@@ -1,0 +1,20 @@
+esp-idf/esp_coex/CMakeFiles/__idf_esp_coex.dir/src/coexist_debug_diagram.c.obj: \
+ /home/paul_/git/esp-idf/components/esp_coex/src/coexist_debug_diagram.c \
+ /home/paul_/git/esp-idf/components/esp_coex/include/private/esp_coexist_debug.h \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug.cdep \
+ /home/paul_/git/OpelXID/build/config/idf/target/esp32.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/diag/general.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/diag/wifi.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/io/count.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/io/idx0.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/io/idx1.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/io/idx2.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/io/idx3.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/io/idx4.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/io/idx5.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/io/idx6.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/io/idx7.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/io/idx8.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/io/idx9.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/io/idx10.cdep \
+ /home/paul_/git/OpelXID/build/config/esp/coex/gpio/debug/io/idx11.cdep

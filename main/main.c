@@ -1,299 +1,129 @@
-/*
- * SPDX-FileCopyrightText: 2025-2026 Espressif Systems (Shanghai) CO LTD
- *
- * SPDX-License-Identifier: Unlicense OR CC0-1.0
- */
-
-#include <stdio.h>
+#include <inttypes.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
+
+#include "esp_err.h"
 #include "esp_log.h"
-#include "esp_bt_device.h"
-#include "esp_gap_bt_api.h"
-#include "esp_a2dp_api.h"
-#include "esp_avrc_api.h"
+#include "nvs_flash.h"
 
-#include "bt_app_core_utils.h"
-#include "bredr_app_common_utils.h"
-#include "a2dp_utils_tags.h"
-#include "a2dp_sink_common_utils.h"
-#include "avrcp_utils_tags.h"
-#include "avrcp_common_utils.h"
-#include "avrcp_metadata_utils.h"
-#if CONFIG_EXAMPLE_A2DP_SINK_STREAM_ENABLE
-#if CONFIG_EXAMPLE_A2DP_SINK_USE_EXTERNAL_CODEC == FALSE
-#include "a2dp_sink_int_codec_utils.h"
-#else
-#include "a2dp_sink_ext_codec_utils.h"
-#endif
-#endif
+#include "app_events.h"
+#include "ble_transport.h"
+#include "config.h"
+#include "frame_reassembly.h"
+#include "protocol_decoder.h"
 
-/* device name */
-static const char local_device_name[] = CONFIG_EXAMPLE_LOCAL_DEVICE_NAME;
+static const char *TAG = "opelxid";
 
-/* event for stack up */
-enum {
-    BT_APP_EVT_STACK_UP = 0,
-};
+typedef struct {
+    size_t len;
+    uint8_t data[OPX_MAX_BLE_WRITE_SIZE];
+} rx_chunk_t;
 
-/********************************
- * STATIC FUNCTION DECLARATIONS
- *******************************/
+static QueueHandle_t s_rx_queue;
 
-/* Device callback function */
-static void bt_app_dev_cb(esp_bt_dev_cb_event_t event, esp_bt_dev_cb_param_t *param);
-
-/* GAP callback function */
-static void bt_app_gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param);
-
-/* callback function for A2DP sink */
-static void bt_app_a2d_cb(esp_a2d_cb_event_t event, esp_a2d_cb_param_t *param);
-
-#if CONFIG_EXAMPLE_A2DP_SINK_STREAM_ENABLE
-#if CONFIG_EXAMPLE_A2DP_SINK_USE_EXTERNAL_CODEC == FALSE
-/* callback function for A2DP sink audio data stream */
-static void bt_app_a2d_data_cb(const uint8_t *data, uint32_t len);
-#else
-/* callback function for A2DP sink undecoded audio data */
-static void bt_app_a2d_audio_data_cb(esp_a2d_conn_hdl_t conn_hdl, esp_a2d_audio_buff_t *audio_buf);
-#endif
-#endif
-
-/* handler for AVRCP controller events */
-static void bt_app_avrc_ct_evt_hdl(uint16_t event, void *param);
-
-/* callback function for AVRCP controller */
-static void bt_app_rc_ct_cb(esp_avrc_ct_cb_event_t event, esp_avrc_ct_cb_param_t *param);
-
-/* callback function for AVRCP target */
-static void bt_app_rc_tg_cb(esp_avrc_tg_cb_event_t event, esp_avrc_tg_cb_param_t *param);
-
-/* handler for bluetooth stack enabled events */
-static void bt_av_hdl_stack_evt(uint16_t event, void *p_param);
-
-/*******************************
- * STATIC FUNCTION DEFINITIONS
- ******************************/
-
-static void bt_app_dev_cb(esp_bt_dev_cb_event_t event, esp_bt_dev_cb_param_t *param)
+static void on_protocol_frame(const uint8_t *frame, size_t len, void *ctx)
 {
-    bredr_app_dev_evt_def_hdl(event, param);
+    (void)ctx;
+    protocol_decoder_process(frame, len);
 }
 
-static void bt_app_gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param)
+static void protocol_task(void *arg)
 {
-    bredr_app_gap_evt_def_hdl(event, param);
-}
+    (void)arg;
 
-static void bt_app_a2d_cb(esp_a2d_cb_event_t event, esp_a2d_cb_param_t *param)
-{
-    switch (event) {
-    case ESP_A2D_PROF_STATE_EVT:
-    case ESP_A2D_SNK_PSC_CFG_EVT:
-    case ESP_A2D_SNK_SET_DELAY_VALUE_EVT:
-    case ESP_A2D_SNK_GET_DELAY_VALUE_EVT: {
-        bt_app_work_dispatch(bt_a2d_evt_def_hdl, event, param, sizeof(esp_a2d_cb_param_t), NULL, NULL);
-        break;
-    }
-    case ESP_A2D_CONNECTION_STATE_EVT:
-    case ESP_A2D_AUDIO_CFG_EVT:
-    case ESP_A2D_SEP_REG_STATE_EVT: {
-#if CONFIG_EXAMPLE_A2DP_SINK_STREAM_ENABLE
-#if CONFIG_EXAMPLE_A2DP_SINK_USE_EXTERNAL_CODEC == FALSE
-        bt_app_work_dispatch(bt_a2d_evt_int_codec_hdl, event, param, sizeof(esp_a2d_cb_param_t), NULL, NULL);
-#else
-        bt_app_work_dispatch(bt_a2d_evt_ext_codec_hdl, event, param, sizeof(esp_a2d_cb_param_t), NULL, NULL);
-#endif
-#else
-        bt_app_work_dispatch(bt_a2d_evt_def_hdl, event, param, sizeof(esp_a2d_cb_param_t), NULL, NULL);
-#endif
-        break;
-    }
-    case ESP_A2D_AUDIO_STATE_EVT:
-        /* Ignore audio state events to prevent phone audio mute */
-        ESP_LOGI(BT_AV_TAG, "A2DP audio state event ignored (metadata-only mode)");
-        break;
-    default:
-        ESP_LOGE(BT_AV_TAG, "Invalid A2DP event: %d", event);
-        break;
-    }
-}
+    frame_reassembly_t reassembly;
+    frame_reassembly_init(&reassembly);
 
-#if CONFIG_EXAMPLE_A2DP_SINK_STREAM_ENABLE
-#if CONFIG_EXAMPLE_A2DP_SINK_USE_EXTERNAL_CODEC == FALSE
-static void bt_app_a2d_data_cb(const uint8_t *data, uint32_t len)
-{
-    bt_a2d_data_hdl(data, len);
-}
-#else
-static void bt_app_a2d_audio_data_cb(esp_a2d_conn_hdl_t conn_hdl, esp_a2d_audio_buff_t *audio_buf)
-{
-    bt_a2d_audio_data_hdl(conn_hdl, audio_buf);
-}
-#endif
-#endif
-
-static void bt_app_avrc_ct_evt_hdl(uint16_t event, void *param)
-{
-    ESP_LOGD(BT_RC_CT_TAG, "%s event: %d", __func__, event);
-
-    esp_avrc_ct_cb_param_t *rc = (esp_avrc_ct_cb_param_t *)(param);
-
-    switch (event) {
-    case ESP_AVRC_CT_PASSTHROUGH_RSP_EVT:
-    case ESP_AVRC_CT_REMOTE_FEATURES_EVT:
-    case ESP_AVRC_CT_PROF_STATE_EVT: {
-        bt_avrc_common_ct_evt_def_hdl(event, param);
-        break;
-    }
-    case ESP_AVRC_CT_CONNECTION_STATE_EVT: {
-        bt_avrc_md_ct_evt_hdl(event, param);
-        if (rc->conn_stat.connected) {
-            /* get remote supported event_ids of peer AVRCP Target */
-            bt_avrc_common_ct_get_peer_rn_cap();
-        } else {
-            /* clear peer notification capability record */
-            bt_avrc_common_ct_set_peer_rn_cap(0);
+    rx_chunk_t chunk;
+    while (true) {
+        if (xQueueReceive(s_rx_queue, &chunk, portMAX_DELAY) != pdTRUE) {
+            continue;
         }
-        break;
-    }
-    case ESP_AVRC_CT_CHANGE_NOTIFY_EVT: {
-        bt_avrc_md_ct_evt_hdl(event, param);
-        bt_avrc_common_ct_notify_evt_handler(rc->change_ntf.event_id, &rc->change_ntf.event_parameter);
-        break;
-    }
-    case ESP_AVRC_CT_GET_RN_CAPABILITIES_RSP_EVT: {
-        /* set peer notification capability record */
-        bt_avrc_common_ct_set_peer_rn_cap(rc->get_rn_caps_rsp.evt_set.bits);
-        bt_avrc_common_ct_rn_track_changed();
-        bt_avrc_common_ct_rn_play_status_changed();
-        bt_avrc_common_ct_rn_play_pos_changed();
 
-        bt_avrc_md_ct_evt_hdl(event, param);
-        break;
-    }
-    case ESP_AVRC_CT_METADATA_RSP_EVT: {
-        bt_avrc_md_ct_evt_hdl(event, param);
-        break;
-    }
-    default:
-        ESP_LOGE(BT_RC_CT_TAG, "Invalid AVRC event: %d", event);
-        break;
+        frame_reassembly_push(&reassembly, chunk.data, chunk.len, on_protocol_frame, NULL);
     }
 }
 
-static void bt_app_rc_ct_cb(esp_avrc_ct_cb_event_t event, esp_avrc_ct_cb_param_t *param)
+static void ble_rx_cb(const uint8_t *data, size_t len, void *ctx)
 {
-    switch (event) {
-    case ESP_AVRC_CT_METADATA_RSP_EVT: {
-        bt_app_work_dispatch(bt_app_avrc_ct_evt_hdl, event, param, sizeof(esp_avrc_ct_cb_param_t),
-                             bt_avrc_common_copy_metadata, bt_avrc_common_free_metadata);
-        break;
+    (void)ctx;
+
+    if (data == NULL || len == 0 || len > OPX_MAX_BLE_WRITE_SIZE) {
+        return;
     }
-    case ESP_AVRC_CT_CONNECTION_STATE_EVT:
-    case ESP_AVRC_CT_PASSTHROUGH_RSP_EVT:
-    case ESP_AVRC_CT_CHANGE_NOTIFY_EVT:
-    case ESP_AVRC_CT_REMOTE_FEATURES_EVT:
-    case ESP_AVRC_CT_GET_RN_CAPABILITIES_RSP_EVT:
-    case ESP_AVRC_CT_PROF_STATE_EVT:
-        bt_app_work_dispatch(bt_app_avrc_ct_evt_hdl, event, param, sizeof(esp_avrc_ct_cb_param_t), NULL, NULL);
-        break;
-    default:
-        ESP_LOGE(BT_RC_CT_TAG, "Invalid AVRC event: %d", event);
-        break;
+
+    rx_chunk_t chunk = {
+        .len = len,
+    };
+    memcpy(chunk.data, data, len);
+
+    if (xQueueSend(s_rx_queue, &chunk, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "RX queue full, dropping chunk len=%u", (unsigned)len);
     }
 }
 
-static void bt_app_rc_tg_cb(esp_avrc_tg_cb_event_t event, esp_avrc_tg_cb_param_t *param)
+static void app_event_logger(const app_event_t *event, void *ctx)
 {
-    switch (event) {
-    case ESP_AVRC_TG_CONNECTION_STATE_EVT:
-    case ESP_AVRC_TG_REMOTE_FEATURES_EVT:
-    case ESP_AVRC_TG_PASSTHROUGH_CMD_EVT:
-    case ESP_AVRC_TG_SET_ABSOLUTE_VOLUME_CMD_EVT:
-    case ESP_AVRC_TG_REGISTER_NOTIFICATION_EVT:
-    case ESP_AVRC_TG_SET_PLAYER_APP_VALUE_EVT:
-    case ESP_AVRC_TG_PROF_STATE_EVT:
-        bt_app_work_dispatch(bt_avrc_common_tg_evt_def_hdl, event, param, sizeof(esp_avrc_tg_cb_param_t), NULL, NULL);
+    (void)ctx;
+
+    if (event == NULL) {
+        return;
+    }
+
+    switch (event->type) {
+    case APP_EVENT_AUDIO_METADATA:
+        ESP_LOGI(TAG,
+                 "audio state=%d track='%s' artist='%s' updated_ms=%" PRId64,
+                 (int)event->data.audio.playback_state,
+                 event->data.audio.track,
+                 event->data.audio.artist,
+                 event->data.audio.updated_ms);
+        break;
+    case APP_EVENT_TIME_SYNC:
+        ESP_LOGI(TAG,
+                 "time sync success=%d epoch=%" PRId64,
+                 (int)event->data.time.success,
+                 (int64_t)event->data.time.epoch_seconds);
         break;
     default:
-        ESP_LOGE(BT_RC_TG_TAG, "Invalid AVRC event: %d", event);
         break;
     }
 }
 
-static void bt_av_hdl_stack_evt(uint16_t event, void *p_param)
+static esp_err_t init_nvs(void)
 {
-    ESP_LOGD(BT_AV_TAG, "%s event: %d", __func__, event);
-
-    switch (event) {
-    /* when do the stack up, this event comes */
-    case BT_APP_EVT_STACK_UP: {
-        esp_bt_gap_set_device_name(local_device_name);
-        esp_bt_dev_register_callback(bt_app_dev_cb);
-        esp_bt_gap_register_callback(bt_app_gap_cb);
-
-        esp_avrc_ct_register_callback(bt_app_rc_ct_cb);
-        assert(esp_avrc_ct_init() == ESP_OK);
-        esp_avrc_tg_register_callback(bt_app_rc_tg_cb);
-        assert(esp_avrc_tg_init() == ESP_OK);
-
-        esp_a2d_register_callback(&bt_app_a2d_cb);
-        assert(esp_a2d_sink_init() == ESP_OK);
-
-#if CONFIG_EXAMPLE_A2DP_SINK_STREAM_ENABLE
-#if CONFIG_EXAMPLE_A2DP_SINK_USE_EXTERNAL_CODEC == FALSE
-        esp_a2d_sink_register_data_callback(bt_app_a2d_data_cb);
-#else
-        esp_a2d_mcc_t mcc = {0};
-        mcc.type = ESP_A2D_MCT_SBC;
-        mcc.cie.sbc_info.samp_freq = ESP_A2D_SBC_CIE_SF_16K |
-                                     ESP_A2D_SBC_CIE_SF_32K |
-                                     ESP_A2D_SBC_CIE_SF_44K |
-                                     ESP_A2D_SBC_CIE_SF_48K;
-        mcc.cie.sbc_info.ch_mode = ESP_A2D_SBC_CIE_CH_MODE_MONO |
-                                   ESP_A2D_SBC_CIE_CH_MODE_DUAL_CHANNEL |
-                                   ESP_A2D_SBC_CIE_CH_MODE_STEREO |
-                                   ESP_A2D_SBC_CIE_CH_MODE_JOINT_STEREO;
-        mcc.cie.sbc_info.block_len = ESP_A2D_SBC_CIE_BLOCK_LEN_4 |
-                                     ESP_A2D_SBC_CIE_BLOCK_LEN_8 |
-                                     ESP_A2D_SBC_CIE_BLOCK_LEN_12 |
-                                     ESP_A2D_SBC_CIE_BLOCK_LEN_16;
-        mcc.cie.sbc_info.num_subbands = ESP_A2D_SBC_CIE_NUM_SUBBANDS_4 | ESP_A2D_SBC_CIE_NUM_SUBBANDS_8;
-        mcc.cie.sbc_info.alloc_mthd = ESP_A2D_SBC_CIE_ALLOC_MTHD_SNR | ESP_A2D_SBC_CIE_ALLOC_MTHD_LOUDNESS;
-        mcc.cie.sbc_info.max_bitpool = 250;
-        mcc.cie.sbc_info.min_bitpool = 2;
-        /* register stream end point, only support SBC currently */
-        esp_a2d_sink_register_stream_endpoint(0, &mcc);
-        esp_a2d_sink_register_audio_data_callback(bt_app_a2d_audio_data_cb);
-#endif
-#endif
-
-        /* Get the default value of the delay value */
-        esp_a2d_sink_get_delay_value();
-        /* Get local device name */
-        esp_bt_gap_get_device_name();
-
-        /* set discoverable and connectable mode, wait to be connected */
-        esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, ESP_BT_GENERAL_DISCOVERABLE);
-        break;
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
     }
-    /* others */
-    default:
-        ESP_LOGE(BT_AV_TAG, "%s unhandled event: %d", __func__, event);
-        break;
-    }
+    return err;
 }
-
-/*******************************
- * MAIN ENTRY POINT
- ******************************/
 
 void app_main(void)
 {
-    ESP_ERROR_CHECK(bredr_app_common_init());
+    ESP_ERROR_CHECK(init_nvs());
 
-    bt_app_task_start_up();
-    /* bluetooth device name, connection mode and profile set up */
-    bt_app_work_dispatch(bt_av_hdl_stack_evt, BT_APP_EVT_STACK_UP, NULL, 0, NULL, NULL);
+    app_events_init();
+    app_events_register_callback(app_event_logger, NULL);
+
+    s_rx_queue = xQueueCreate(CONFIG_OPX_RX_QUEUE_DEPTH, sizeof(rx_chunk_t));
+    ESP_ERROR_CHECK(s_rx_queue == NULL ? ESP_FAIL : ESP_OK);
+
+    BaseType_t ok = xTaskCreate(protocol_task,
+                                "protocol_task",
+                                OPX_PROTOCOL_TASK_STACK,
+                                NULL,
+                                OPX_PROTOCOL_TASK_PRIORITY,
+                                NULL);
+    ESP_ERROR_CHECK(ok == pdPASS ? ESP_OK : ESP_FAIL);
+
+    ESP_ERROR_CHECK(ble_transport_start(CONFIG_OPX_DEVICE_NAME, ble_rx_cb, NULL));
+
+    ESP_LOGI(TAG, "Phase 1 started: RX-only time and audio metadata sync");
 }

@@ -1,0 +1,35 @@
+esp-idf/esp_rom/CMakeFiles/__idf_esp_rom.dir/patches/esp_rom_spiflash.c.obj: \
+ /home/paul_/git/esp-idf/components/esp_rom/patches/esp_rom_spiflash.c \
+ /home/paul_/git/OpelXID/build/bootloader/config/sdkconfig.h \
+ /home/paul_/git/esp-idf/components/soc/esp32/include/soc/soc_caps.h \
+ /home/paul_/git/esp-idf/components/soc/include/soc/soc_caps_eval.h \
+ /home/paul_/git/esp-idf/components/soc/esp32/include/soc/soc.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/stdint.h \
+ /home/paul_/git/esp-idf/components/esp_libc/platform_include/sys/cdefs.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/cdefs.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/config.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/machine/ieeefp.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/features.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/picolibc.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/machine/_default_types.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/16.1.0/include/stddef.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_stdint.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_intsup.h \
+ /home/paul_/git/esp-idf/components/esp_common/include/esp_assert.h \
+ /home/paul_/git/esp-idf/components/esp_libc/platform_include/assert.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/stdlib.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/machine/stdlib.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/alloca.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_locale.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_wait.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/assert.h \
+ /home/paul_/git/esp-idf/components/soc/esp32/include/soc/interrupts.h \
+ /home/paul_/git/esp-idf/components/esp_common/include/esp_bit_defs.h \
+ /home/paul_/git/esp-idf/components/soc/esp32/register/soc/reg_base.h \
+ /home/paul_/git/esp-idf/components/soc/esp32/register/soc/spi_reg.h \
+ /home/paul_/git/esp-idf/components/esp_rom/include/esp_rom_spiflash.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/16.1.0/include/stdbool.h \
+ /home/paul_/git/esp-idf/components/esp_rom/include/esp_rom_spiflash_defs.h \
+ /home/paul_/git/esp-idf/components/esp_rom/esp32/include/esp32/rom/spi_flash.h \
+ /home/paul_/git/esp-idf/components/esp_common/include/esp_attr.h \
+ /home/paul_/git/esp-idf/components/esp_common/include/esp_assert.h

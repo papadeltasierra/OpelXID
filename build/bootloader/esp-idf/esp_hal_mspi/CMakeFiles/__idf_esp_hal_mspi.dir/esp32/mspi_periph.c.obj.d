@@ -1,0 +1,20 @@
+esp-idf/esp_hal_mspi/CMakeFiles/__idf_esp_hal_mspi.dir/esp32/mspi_periph.c.obj: \
+ /home/paul_/git/esp-idf/components/esp_hal_mspi/esp32/mspi_periph.c \
+ /home/paul_/git/esp-idf/components/soc/esp32/include/soc/periph_defs.h \
+ /home/paul_/git/esp-idf/components/esp_hal_mspi/include/hal/mspi_periph.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/stdint.h \
+ /home/paul_/git/esp-idf/components/esp_libc/platform_include/sys/cdefs.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/cdefs.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/config.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/machine/ieeefp.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/features.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/picolibc.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/machine/_default_types.h \
+ /home/paul_/git/OpelXID/build/bootloader/config/sdkconfig.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/16.1.0/include/stddef.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_stdint.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_intsup.h \
+ /home/paul_/git/esp-idf/components/soc/esp32/include/soc/soc_caps.h \
+ /home/paul_/git/esp-idf/components/soc/include/soc/soc_caps_eval.h \
+ /home/paul_/git/esp-idf/components/esp_hal_mspi/esp32/include/hal/mspi_ll.h \
+ /home/paul_/git/esp-idf/components/soc/esp32/include/soc/interrupts.h

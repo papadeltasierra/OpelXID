@@ -1,23 +1,14 @@
-menu "AVRCP Example Configuration"
-    config EXAMPLE_LOCAL_DEVICE_NAME
-        string "Local Device Name"
-        default "OpenXID"
+menu "OpelXID Configuration"
+    config OPX_DEVICE_NAME
+        string "BLE device name"
+        default "OpelXID"
         help
-            Use this option to set local device name.
+            Public GAP device name advertised to the phone app.
 
-    config EXAMPLE_A2DP_SINK_STREAM_ENABLE
-        bool "Enable A2DP Sink Stream"
-        default n
+    config OPX_RX_QUEUE_DEPTH
+        int "RX queue depth"
+        default 16
+        range 4 64
         help
-            This enables the A2DP sink stream. If disable this option,
-            audio data will not be transmitted
-
-    config EXAMPLE_A2DP_SINK_USE_EXTERNAL_CODEC
-        bool "Use External Codec Instead of Internal"
-        depends on EXAMPLE_A2DP_SINK_STREAM_ENABLE
-        default n
-        select BT_A2DP_USE_EXTERNAL_CODEC
-        help
-            If enable, Bluedroid stack will not decode A2DP audio data, user need to decode it in application layer.
-
+            Number of BLE write chunks buffered between NimBLE callbacks and protocol task.
 endmenu

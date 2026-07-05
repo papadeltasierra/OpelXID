@@ -1,0 +1,2 @@
+source /home/paul_/git/OpelXID/build/bootloader/gdbinit/symbols
+source /home/paul_/git/OpelXID/build/bootloader/gdbinit/connect

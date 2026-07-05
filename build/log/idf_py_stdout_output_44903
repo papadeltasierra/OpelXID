@@ -1,0 +1,352 @@
+Command: make -j 18 all
+-- Component directory /home/paul_/git/esp-idf/components/idf_test does not contain a CMakeLists.txt file. No component will be added
+-- Minimal build - ON
+-- esp-idf-configdep will be used for faster recompilation
+-- Compiler launcher chain: esp-idf-configdep
+-- Building ESP-IDF components for target esp32
+-- ESP-TEE is currently supported only on the esp32c6;esp32h2;esp32c5;esp32c61 SoCs
+-- KCONFIG_REPORT_VERBOSITY not set, using default
+-- Project sdkconfig file /home/paul_/git/OpelXID/sdkconfig
+-- Compiler supported targets: xtensa-esp-elf
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- App "opelxid" version: 9f7ce31-dirty
+-- Setting up mbedtls configuration
+-- Linkage type is PUBLIC
+-- Adding linker script /home/paul_/git/esp-idf/components/esp_system/ld/esp32/memory.ld.in
+--   -> Preprocessing .in script: /home/paul_/git/esp-idf/components/esp_system/ld/esp32/memory.ld.in
+-- Adding linker script /home/paul_/git/esp-idf/components/esp_system/ld/esp32/sections.ld.in
+--   -> Preprocessing .in script: /home/paul_/git/esp-idf/components/esp_system/ld/esp32/sections.ld.in
+--   -> Applying ldgen processing: /home/paul_/git/OpelXID/build/esp-idf/esp_system/ld/sections.ld.in
+-- Adding linker script /home/paul_/git/esp-idf/components/esp_rom/esp32/ld/esp32.rom.ld
+-- Adding linker script /home/paul_/git/esp-idf/components/esp_rom/esp32/ld/esp32.rom.api.ld
+-- Adding linker script /home/paul_/git/esp-idf/components/esp_rom/esp32/ld/esp32.rom.libgcc.ld
+-- Adding linker script /home/paul_/git/esp-idf/components/esp_rom/esp32/ld/esp32.rom.libc-funcs.ld
+-- Adding linker script /home/paul_/git/esp-idf/components/soc/esp32/ld/esp32.peripherals.ld
+-- Adding linker script /home/paul_/git/esp-idf/components/esp_hal_regi2c/esp32/rom.regi2c.ld
+-- Components: app_update bootloader bootloader_support bt cxx efuse esp_app_format esp_blockdev esp_bootloader_format esp_coex esp_common esp_driver_dma esp_driver_gpio esp_driver_spi esp_driver_uart esp_driver_usb_serial_jtag esp_event esp_gdbstub esp_hal_ana_conv esp_hal_clock esp_hal_dma esp_hal_gpio esp_hal_gpspi esp_hal_i2s esp_hal_mspi esp_hal_pmu esp_hal_regi2c esp_hal_rtc_timer esp_hal_security esp_hal_systimer esp_hal_timg esp_hal_touch_sens esp_hal_uart esp_hal_usb esp_hal_wdt esp_hw_support esp_libc esp_mm esp_netif esp_netif_stack esp_partition esp_phy esp_pm esp_psram esp_ringbuf esp_rom esp_security esp_stdio esp_system esp_timer esp_usb_cdc_rom_console esp_wifi esptool_py freertos hal heap log lwip main mbedtls nvs_flash nvs_sec_provider partition_table pthread soc spi_flash vfs wpa_supplicant xtensa
+-- Component paths: /home/paul_/git/esp-idf/components/app_update /home/paul_/git/esp-idf/components/bootloader /home/paul_/git/esp-idf/components/bootloader_support /home/paul_/git/esp-idf/components/bt /home/paul_/git/esp-idf/components/cxx /home/paul_/git/esp-idf/components/efuse /home/paul_/git/esp-idf/components/esp_app_format /home/paul_/git/esp-idf/components/esp_blockdev /home/paul_/git/esp-idf/components/esp_bootloader_format /home/paul_/git/esp-idf/components/esp_coex /home/paul_/git/esp-idf/components/esp_common /home/paul_/git/esp-idf/components/esp_driver_dma /home/paul_/git/esp-idf/components/esp_driver_gpio /home/paul_/git/esp-idf/components/esp_driver_spi /home/paul_/git/esp-idf/components/esp_driver_uart /home/paul_/git/esp-idf/components/esp_driver_usb_serial_jtag /home/paul_/git/esp-idf/components/esp_event /home/paul_/git/esp-idf/components/esp_gdbstub /home/paul_/git/esp-idf/components/esp_hal_ana_conv /home/paul_/git/esp-idf/components/esp_hal_clock /home/paul_/git/esp-idf/components/esp_hal_dma /home/paul_/git/esp-idf/components/esp_hal_gpio /home/paul_/git/esp-idf/components/esp_hal_gpspi /home/paul_/git/esp-idf/components/esp_hal_i2s /home/paul_/git/esp-idf/components/esp_hal_mspi /home/paul_/git/esp-idf/components/esp_hal_pmu /home/paul_/git/esp-idf/components/esp_hal_regi2c /home/paul_/git/esp-idf/components/esp_hal_rtc_timer /home/paul_/git/esp-idf/components/esp_hal_security /home/paul_/git/esp-idf/components/esp_hal_systimer /home/paul_/git/esp-idf/components/esp_hal_timg /home/paul_/git/esp-idf/components/esp_hal_touch_sens /home/paul_/git/esp-idf/components/esp_hal_uart /home/paul_/git/esp-idf/components/esp_hal_usb /home/paul_/git/esp-idf/components/esp_hal_wdt /home/paul_/git/esp-idf/components/esp_hw_support /home/paul_/git/esp-idf/components/esp_libc /home/paul_/git/esp-idf/components/esp_mm /home/paul_/git/esp-idf/components/esp_netif /home/paul_/git/esp-idf/components/esp_netif_stack /home/paul_/git/esp-idf/components/esp_partition /home/paul_/git/esp-idf/components/esp_phy /home/paul_/git/esp-idf/components/esp_pm /home/paul_/git/esp-idf/components/esp_psram /home/paul_/git/esp-idf/components/esp_ringbuf /home/paul_/git/esp-idf/components/esp_rom /home/paul_/git/esp-idf/components/esp_security /home/paul_/git/esp-idf/components/esp_stdio /home/paul_/git/esp-idf/components/esp_system /home/paul_/git/esp-idf/components/esp_timer /home/paul_/git/esp-idf/components/esp_usb_cdc_rom_console /home/paul_/git/esp-idf/components/esp_wifi /home/paul_/git/esp-idf/components/esptool_py /home/paul_/git/esp-idf/components/freertos /home/paul_/git/esp-idf/components/hal /home/paul_/git/esp-idf/components/heap /home/paul_/git/esp-idf/components/log /home/paul_/git/esp-idf/components/lwip /home/paul_/git/OpelXID/main /home/paul_/git/esp-idf/components/mbedtls /home/paul_/git/esp-idf/components/nvs_flash /home/paul_/git/esp-idf/components/nvs_sec_provider /home/paul_/git/esp-idf/components/partition_table /home/paul_/git/esp-idf/components/pthread /home/paul_/git/esp-idf/components/soc /home/paul_/git/esp-idf/components/spi_flash /home/paul_/git/esp-idf/components/vfs /home/paul_/git/esp-idf/components/wpa_supplicant /home/paul_/git/esp-idf/components/xtensa
+-- Configuring done (7.0s)
+-- Generating done (0.6s)
+-- Build files have been written to: /home/paul_/git/OpelXID/build
+[  0%] Built target _project_elf_src
+[  0%] Built target partition_table_bin
+[  0%] Built target custom_bundle
+[  0%] Preprocessing linker script /home/paul_/git/esp-idf/components/esp_system/ld/esp32/sections.ld.in -> /home/paul_/git/OpelXID/build/esp-idf/esp_system/ld/sections.ld.in
+[  1%] Preprocessing linker script /home/paul_/git/esp-idf/components/esp_system/ld/esp32/memory.ld.in -> /home/paul_/git/OpelXID/build/esp-idf/esp_system/ld/memory.ld
+[  1%] Performing build step for 'bootloader'
+[  1%] Built target sections_ld_in_preprocess
+[  1%] Built target memory_ld_in_preprocess
+-- Component directory /home/paul_/git/esp-idf/components/idf_test does not contain a CMakeLists.txt file. No component will be added
+[ 11%] Built target __idf_lwip
+[ 12%] Built target __idf_vfs
+[ 13%] Built target __idf_esp_driver_uart
+[ 13%] Built target __idf_esp_psram
+[ 13%] Built target __idf_esp_ringbuf
+[ 15%] Built target __idf_nvs_flash
+[ 16%] Built target __idf_nvs_sec_provider
+[ 17%] Built target __idf_esp_timer
+[ 17%] Built target __idf_cxx
+[ 18%] Built target __idf_pthread
+[ 20%] Built target __idf_esp_libc
+[ 20%] Building ASM object esp-idf/freertos/CMakeFiles/__idf_freertos.dir/FreeRTOS-Kernel/portable/xtensa/portasm.S.obj
+[ 20%] Linking C static library libfreertos.a
+[ 22%] Built target __idf_freertos
+[ 22%] Building C object esp-idf/esp_hw_support/CMakeFiles/__idf_esp_hw_support.dir/__/__/esp_err_codes/esp_hw_support_esp_err_codes.c.obj
+[ 22%] Linking C static library libesp_hw_support.a
+-- Minimal build - OFF
+-- No compiler launcher chain will be used.
+[ 28%] Built target __idf_esp_hw_support
+[ 28%] Built target __idf_esp_hal_touch_sens
+[ 28%] Built target __idf_esp_hal_pmu
+[ 28%] Built target __idf_esp_hal_gpio
+[ 28%] Built target __idf_soc
+[ 28%] Built target __idf_heap
+[ 30%] Built target __idf_log
+[ 31%] Built target __idf_hal
+[ 31%] Building ASM object esp-idf/esp_rom/CMakeFiles/__idf_esp_rom.dir/patches/esp_rom_longjmp.S.obj
+[ 31%] Linking C static library libesp_rom.a
+[ 32%] Built target __idf_esp_rom
+[ 32%] Built target __idf_esp_common
+-- Building ESP-IDF components for target esp32
+[ 32%] Building ASM object esp-idf/esp_system/CMakeFiles/__idf_esp_system.dir/port/arch/xtensa/esp_ipc_isr_routines.S.obj
+[ 32%] Building ASM object esp-idf/esp_system/CMakeFiles/__idf_esp_system.dir/port/arch/xtensa/esp_ipc_isr_handler.S.obj
+[ 32%] Building ASM object esp-idf/esp_system/CMakeFiles/__idf_esp_system.dir/port/arch/xtensa/panic_handler_asm.S.obj
+[ 32%] Building ASM object esp-idf/esp_system/CMakeFiles/__idf_esp_system.dir/port/soc/esp32/highint_hdl.S.obj
+[ 32%] Linking C static library libesp_system.a
+[ 36%] Built target __idf_esp_system
+[ 39%] Built target __idf_spi_flash
+[ 41%] Built target __idf_bootloader_support
+[ 42%] Built target __idf_esp_hal_ana_conv
+[ 42%] Built target __idf_esp_hal_i2s
+[ 42%] Built target __idf_esp_hal_wdt
+[ 42%] Built target __idf_esp_hal_timg
+[ 42%] Built target everest
+[ 42%] Built target p256-m
+[ 47%] Built target builtin
+[ 47%] Built target pqcp
+-- ESP-TEE is currently supported only on the esp32c6;esp32h2;esp32c5;esp32c61 SoCs
+[ 48%] Built target extras
+[ 49%] Built target platform
+[ 50%] Built target utilities
+[ 54%] Built target tfpsacrypto
+[ 57%] Built target mbedtls
+[ 58%] Built target mbedx509
+[ 59%] Built target __idf_mbedtls
+[ 59%] Built target __idf_esp_driver_dma
+[ 60%] Built target __idf_esp_mm
+[ 61%] Built target __idf_esp_pm
+[ 62%] Built target __idf_esp_hal_uart
+[ 63%] Built target __idf_esp_driver_gpio
+[ 64%] Built target __idf_esp_security
+[ 66%] Built target __idf_efuse
+-- KCONFIG_REPORT_VERBOSITY not set, using default
+-- Project sdkconfig file /home/paul_/git/OpelXID/sdkconfig
+[ 67%] Built target __idf_esp_partition
+[ 67%] Built target __idf_app_update
+[ 67%] Built target __idf_esp_bootloader_format
+[ 67%] Built target __idf_esp_app_format
+[ 68%] Built target __idf_esp_hal_security
+[ 69%] Built target __idf_esp_hal_mspi
+[ 69%] Built target __idf_esp_hal_clock
+[ 70%] Built target __idf_esp_hal_gpspi
+[ 70%] Built target __idf_esp_stdio
+[ 70%] Building ASM object esp-idf/xtensa/CMakeFiles/__idf_xtensa.dir/xtensa_context.S.obj
+[ 70%] Building ASM object esp-idf/xtensa/CMakeFiles/__idf_xtensa.dir/xtensa_vectors.S.obj
+[ 70%] Building ASM object esp-idf/xtensa/CMakeFiles/__idf_xtensa.dir/xtensa_intr_asm.S.obj
+[ 71%] Linking C static library libxtensa.a
+[ 71%] Built target __idf_xtensa
+[ 71%] Built target __idf_esp_event
+[ 71%] Built target __idf_esp_driver_spi
+[ 71%] Building ASM object esp-idf/esp_gdbstub/CMakeFiles/__idf_esp_gdbstub.dir/src/port/xtensa/gdbstub-entry.S.obj
+-- Compiler supported targets: xtensa-esp-elf
+-- Detecting C compiler ABI info
+[ 71%] Linking C static library libesp_gdbstub.a
+[ 72%] Built target __idf_esp_netif
+[ 73%] Built target __idf_esp_gdbstub
+[ 75%] Built target __idf_esp_wifi
+[ 76%] Built target __idf_esp_coex
+-- Detecting C compiler ABI info - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+[ 85%] Built target __idf_wpa_supplicant
+[ 85%] Built target __idf_esp_phy
+-- Detecting C compiler ABI info
+[ 86%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/hci_log/bt_hci_log.c.obj
+[ 86%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/btc/core/btc_alarm.c.obj
+[ 86%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/hci_log/bt_hci_log_insights.c.obj
+[ 86%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/api/esp_blufi_api.c.obj
+[ 86%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/btc/core/btc_manage.c.obj
+[ 86%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/btc/core/btc_task.c.obj
+[ 86%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/btc/profile/esp/blufi/blufi_prf.c.obj
+[ 86%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/btc/profile/esp/blufi/blufi_protocol.c.obj
+[ 86%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/alarm.c.obj
+[ 86%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/allocator.c.obj
+[ 86%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/buffer.c.obj
+[ 87%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/config.c.obj
+[ 87%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/fixed_queue.c.obj
+[ 87%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/pkt_queue.c.obj
+[ 87%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/fixed_pkt_queue.c.obj
+[ 87%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/hash_functions.c.obj
+[ 87%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/future.c.obj
+-- Detecting C compiler ABI info - done
+[ 87%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/list.c.obj
+[ 87%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/hash_map.c.obj
+-- Detecting CXX compiler ABI info
+[ 87%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/mutex.c.obj
+[ 87%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/thread.c.obj
+[ 88%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/osi.c.obj
+[ 88%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/osi/semaphore.c.obj
+[ 88%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/ble_log/deprecated/ble_log_spi_out.c.obj
+[ 88%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/utils.c.obj
+[ 88%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/sha256.c.obj
+[ 88%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/ctr_mode.c.obj
+[ 88%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/ctr_prng.c.obj
+[ 88%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/ecc.c.obj
+[ 88%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/aes_decrypt.c.obj
+[ 89%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/aes_encrypt.c.obj
+[ 89%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/ccm_mode.c.obj
+[ 89%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/ecc_dsa.c.obj
+[ 89%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/cmac_mode.c.obj
+[ 89%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/hmac_prng.c.obj
+[ 89%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/ecc_dh.c.obj
+[ 89%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/ecc_platform_specific.c.obj
+[ 89%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/hmac.c.obj
+[ 90%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/controller/esp32/bt.c.obj
+[ 90%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/port/esp_tinycrypt_port.c.obj
+[ 90%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/tinycrypt/src/cbc_mode.c.obj
+[ 90%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/controller/esp32/hli_api.c.obj
+[ 90%] Building ASM object esp-idf/bt/CMakeFiles/__idf_bt.dir/controller/esp32/hli_vectors.S.obj
+[ 90%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/util/src/addr.c.obj
+[ 90%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/transport/src/transport.c.obj
+[ 90%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/tps/src/ble_svc_tps.c.obj
+[ 90%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/gatt/src/ble_svc_gatt.c.obj
+[ 90%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/ias/src/ble_svc_ias.c.obj
+[ 90%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/ipss/src/ble_svc_ipss.c.obj
+[ 91%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/ans/src/ble_svc_ans.c.obj
+[ 91%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/hr/src/ble_svc_hr.c.obj
+[ 91%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/htp/src/ble_svc_htp.c.obj
+[ 91%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/gap/src/ble_svc_gap.c.obj
+[ 91%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/bas/src/ble_svc_bas.c.obj
+[ 91%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/dis/src/ble_svc_dis.c.obj
+[ 91%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/lls/src/ble_svc_lls.c.obj
+[ 91%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/prox/src/ble_svc_prox.c.obj
+-- Detecting CXX compiler ABI info - done
+-- Adding linker script /home/paul_/git/esp-idf/components/soc/esp32/ld/esp32.peripherals.ld
+-- Adding linker script /home/paul_/git/esp-idf/components/esp_hal_regi2c/esp32/rom.regi2c.ld
+[ 91%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/cts/src/ble_svc_cts.c.obj
+[ 91%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/hid/src/ble_svc_hid.c.obj
+-- Bootloader project name: "bootloader" version: 1
+[ 92%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/sps/src/ble_svc_sps.c.obj
+[ 92%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/cte/src/ble_svc_cte.c.obj
+[ 92%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/services/ras/src/ble_svc_ras.c.obj
+[ 92%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_store_util.c.obj
+[ 92%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_sm.c.obj
+[ 92%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_cs.c.obj
+[ 92%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_conn.c.obj
+[ 92%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_shutdown.c.obj
+-- Adding linker script /home/paul_/git/esp-idf/components/esp_rom/esp32/ld/esp32.rom.ld
+-- Adding linker script /home/paul_/git/esp-idf/components/esp_rom/esp32/ld/esp32.rom.api.ld
+-- Adding linker script /home/paul_/git/esp-idf/components/esp_rom/esp32/ld/esp32.rom.libgcc.ld
+-- Adding linker script /home/paul_/git/esp-idf/components/esp_rom/esp32/ld/esp32.rom.libc-funcs.ld
+[ 92%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_att_svr.c.obj
+[ 92%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_id.c.obj
+[ 93%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_hci_cmd.c.obj
+[ 93%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_gatts_lcl.c.obj
+[ 93%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_l2cap_sig_cmd.c.obj
+[ 93%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_ibeacon.c.obj
+[ 93%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_atomic.c.obj
+[ 93%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_sm_alg.c.obj
+[ 93%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_stop.c.obj
+[ 93%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs.c.obj
+-- Components: bootloader bootloader_support efuse esp_app_format esp_blockdev esp_bootloader_format esp_common esp_hal_ana_conv esp_hal_clock esp_hal_dma esp_hal_gpio esp_hal_gpspi esp_hal_i2s esp_hal_mspi esp_hal_pmu esp_hal_regi2c esp_hal_rtc_timer esp_hal_security esp_hal_systimer esp_hal_timg esp_hal_uart esp_hal_usb esp_hal_wdt esp_hw_support esp_libc esp_rom esp_security esp_stdio esp_system esptool_py freertos hal log main micro-ecc partition_table soc spi_flash xtensa
+-- Component paths: /home/paul_/git/esp-idf/components/bootloader /home/paul_/git/esp-idf/components/bootloader_support /home/paul_/git/esp-idf/components/efuse /home/paul_/git/esp-idf/components/esp_app_format /home/paul_/git/esp-idf/components/esp_blockdev /home/paul_/git/esp-idf/components/esp_bootloader_format /home/paul_/git/esp-idf/components/esp_common /home/paul_/git/esp-idf/components/esp_hal_ana_conv /home/paul_/git/esp-idf/components/esp_hal_clock /home/paul_/git/esp-idf/components/esp_hal_dma /home/paul_/git/esp-idf/components/esp_hal_gpio /home/paul_/git/esp-idf/components/esp_hal_gpspi /home/paul_/git/esp-idf/components/esp_hal_i2s /home/paul_/git/esp-idf/components/esp_hal_mspi /home/paul_/git/esp-idf/components/esp_hal_pmu /home/paul_/git/esp-idf/components/esp_hal_regi2c /home/paul_/git/esp-idf/components/esp_hal_rtc_timer /home/paul_/git/esp-idf/components/esp_hal_security /home/paul_/git/esp-idf/components/esp_hal_systimer /home/paul_/git/esp-idf/components/esp_hal_timg /home/paul_/git/esp-idf/components/esp_hal_uart /home/paul_/git/esp-idf/components/esp_hal_usb /home/paul_/git/esp-idf/components/esp_hal_wdt /home/paul_/git/esp-idf/components/esp_hw_support /home/paul_/git/esp-idf/components/esp_libc /home/paul_/git/esp-idf/components/esp_rom /home/paul_/git/esp-idf/components/esp_security /home/paul_/git/esp-idf/components/esp_stdio /home/paul_/git/esp-idf/components/esp_system /home/paul_/git/esp-idf/components/esptool_py /home/paul_/git/esp-idf/components/freertos /home/paul_/git/esp-idf/components/hal /home/paul_/git/esp-idf/components/log /home/paul_/git/esp-idf/components/bootloader/subproject/main /home/paul_/git/esp-idf/components/bootloader/subproject/components/micro-ecc /home/paul_/git/esp-idf/components/partition_table /home/paul_/git/esp-idf/components/soc /home/paul_/git/esp-idf/components/spi_flash /home/paul_/git/esp-idf/components/xtensa
+-- Adding linker script /home/paul_/git/esp-idf/components/bootloader/subproject/main/ld/esp32/bootloader.memory.ld.in
+--   -> Preprocessing .in script: /home/paul_/git/esp-idf/components/bootloader/subproject/main/ld/esp32/bootloader.memory.ld.in
+-- Adding linker script /home/paul_/git/esp-idf/components/bootloader/subproject/main/ld/esp32/bootloader.sections.ld.in
+--   -> Preprocessing .in script: /home/paul_/git/esp-idf/components/bootloader/subproject/main/ld/esp32/bootloader.sections.ld.in
+[ 93%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_hci_evt.c.obj
+-- Configuring done (4.6s)
+[ 94%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_mqueue.c.obj
+[ 94%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_periodic_sync.c.obj
+[ 94%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_att.c.obj
+[ 94%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_ead.c.obj
+[ 94%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_aes_ccm.c.obj
+[ 94%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_gattc.c.obj
+[ 94%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_store.c.obj
+[ 94%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_sm_lgcy.c.obj
+[ 94%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_cfg.c.obj
+[ 94%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_l2cap_coc.c.obj
+[ 95%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_att_clt.c.obj
+[ 95%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_mbuf.c.obj
+[ 95%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_att_cmd.c.obj
+[ 95%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_log.c.obj
+[ 95%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_eddystone.c.obj
+[ 95%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_startup.c.obj
+[ 95%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_l2cap_sig.c.obj
+[ 95%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_gap.c.obj
+-- Generating done (0.4s)
+[ 95%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_sm_cmd.c.obj
+[ 96%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_uuid.c.obj
+[ 96%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_pvcy.c.obj
+-- Build files have been written to: /home/paul_/git/OpelXID/build/bootloader
+[ 96%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_flow.c.obj
+[ 96%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_l2cap.c.obj
+[ 96%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_sm_sc.c.obj
+[ 96%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_gatts.c.obj
+[ 96%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_misc.c.obj
+[ 96%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_adv.c.obj
+[ 96%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_hci.c.obj
+[  6%] Built target __idf_log
+[ 97%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_hci_util.c.obj
+[  6%] Built target bootloader_memory_ld_in_preprocess
+[ 97%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_hs_resolv.c.obj
+[  7%] Built target bootloader_sections_ld_in_preprocess
+[  8%] Built target _project_elf_src
+[ 97%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/store/ram/src/ble_store_ram.c.obj
+[ 14%] Built target __idf_esp_rom
+[ 97%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/store/config/src/ble_store_nvs.c.obj
+[ 97%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/store/config/src/ble_store_config.c.obj
+[ 97%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_gattc_cache.c.obj
+[ 97%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_gattc_cache_conn.c.obj
+[ 97%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/host/src/ble_eatt.c.obj
+[ 97%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/porting/nimble/src/nimble_port.c.obj
+[ 97%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/port/src/nvs_port.c.obj
+[ 17%] Built target __idf_esp_common
+[ 97%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/common/btc/profile/esp/blufi/nimble_host/esp_blufi.c.obj
+[ 98%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/port/src/esp_nimble_mem.c.obj
+[ 98%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/porting/npl/freertos/src/nimble_port_freertos.c.obj
+[ 26%] Built target __idf_esp_hw_support
+[ 98%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/esp-hci/src/esp_nimble_hci.c.obj
+[ 98%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/nimble/transport/esp_ipc_legacy/src/hci_esp_ipc_legacy.c.obj
+[ 98%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/porting/nimble/src/endian.c.obj
+[ 98%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/porting/nimble/src/mem.c.obj
+[ 98%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/porting/mem/os_mempool.c.obj
+[ 27%] Built target __idf_esp_system
+[ 98%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/porting/nimble/src/os_mbuf.c.obj
+[ 99%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/porting/nimble/src/os_msys_init.c.obj
+[ 99%] Building C object esp-idf/bt/CMakeFiles/__idf_bt.dir/host/nimble/nimble/porting/npl/freertos/src/npl_os_freertos.c.obj
+[ 33%] Built target __idf_efuse
+[ 51%] Built target __idf_bootloader_support
+[ 55%] Built target __idf_esp_security
+[ 56%] Built target __idf_esp_hal_security
+[ 60%] Built target __idf_esp_hal_ana_conv
+[ 61%] Built target __idf_esp_hal_i2s
+[ 62%] Built target __idf_esp_hal_wdt
+[ 64%] Built target __idf_esp_hal_timg
+[ 65%] Built target __idf_micro-ecc
+[ 99%] Linking C static library libbt.a
+[ 66%] Built target __idf_esp_bootloader_format
+[ 69%] Built target __idf_spi_flash
+[ 71%] Built target __idf_esp_hal_mspi
+[ 72%] Built target __idf_esp_hal_clock
+[ 76%] Built target __idf_esp_hal_gpspi
+[ 79%] Built target __idf_esp_hal_uart
+[ 80%] Built target __idf_esp_hal_pmu
+[ 99%] Built target __idf_bt
+[ 84%] Built target __idf_esp_hal_gpio
+[ 99%] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/app_events.c.obj
+[ 99%] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/frame_reassembly.c.obj
+[ 99%] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/audio_state.c.obj
+[ 99%] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/ble_transport.c.obj
+[ 99%] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/main.c.obj
+[ 99%] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/protocol_decoder.c.obj
+[ 99%] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/time_sync.c.obj
+[ 88%] Built target __idf_hal
+[ 93%] Built target __idf_soc
+[ 95%] Built target __idf_xtensa
+[ 97%] Built target __idf_main
+[ 98%] Built target bootloader.elf
+[ 99%] Linking C static library libmain.a
+[100%] Built target gen_bootloader_binary
+[100%] Built target gen_project_binary
+[ 99%] Built target __idf_main
+[ 99%] Generating esp-idf/esp_system/ld/sections.ld
+Bootloader binary size 0x6570 bytes. 0xa90 bytes (9%) free.
+[100%] Built target bootloader_check_size
+[100%] Built target app
+[ 99%] No install step for 'bootloader'
+[ 99%] Completed 'bootloader'
+[100%] Built target bootloader
+[100%] Built target __ldgen_output_sections.ld
+[100%] Building C object CMakeFiles/opelxid.elf.dir/project_elf_src_esp32.c.obj
+[100%] Linking CXX executable opelxid.elf
+Checking ioctl definition overlaps
+[100%] Built target opelxid.elf
+[100%] Generating binary image from built executable
+esptool v5.3.1
+Creating ESP32 image...
+Merged 3 ELF sections.
+Successfully created ESP32 image.
+Generated /home/paul_/git/OpelXID/build/opelxid.bin
+[100%] Built target gen_opelxid_binary
+[100%] Built target gen_project_binary
+opelxid.bin binary size 0x6d8a0 bytes. Smallest app partition is 0x100000 bytes. 0x92760 bytes (57%) free.
+[100%] Built target app_check_size
+[100%] Built target app

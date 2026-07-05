@@ -1,0 +1,12 @@
+#pragma once
+
+#include <stdint.h>
+
+#define OPX_FRAME_MARKER 0xAB
+#define OPX_MIN_FRAME_SIZE 5
+#define OPX_MAX_FRAME_SIZE 512
+#define OPX_MAX_BLE_WRITE_SIZE 244
+#define OPX_MAX_TEXT_PAYLOAD 192
+
+#define OPX_PROTOCOL_TASK_STACK 4096
+#define OPX_PROTOCOL_TASK_PRIORITY 5

@@ -1,0 +1,23 @@
+esp-idf/esp_hw_support/CMakeFiles/__idf_esp_hw_support.dir/esp_gpio_reserve.c.obj: \
+ /home/paul_/git/esp-idf/components/esp_hw_support/esp_gpio_reserve.c \
+ /home/paul_/git/esp-idf/components/esp_libc/platform_include/stdatomic.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/16.1.0/include/stdatomic.h \
+ /home/paul_/git/esp-idf/components/soc/esp32/include/soc/soc_caps.h \
+ /home/paul_/git/esp-idf/components/soc/include/soc/soc_caps_eval.h \
+ /home/paul_/git/esp-idf/components/esp_common/include/esp_types.h \
+ /home/paul_/git/esp-idf/components/esp_libc/platform_include/sys/cdefs.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/cdefs.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/config.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/machine/ieeefp.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/features.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/picolibc.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/machine/_default_types.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/stdint.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/16.1.0/include/stddef.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_stdint.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/picolibc/include/sys/_intsup.h \
+ /home/paul_/.espressif/tools/xtensa-esp-elf/esp-16.1.0_20260609/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/16.1.0/include/stdbool.h \
+ /home/paul_/git/esp-idf/components/esp_common/include/esp_bit_defs.h \
+ /home/paul_/git/esp-idf/components/esp_hw_support/include/esp_private/esp_gpio_reserve.h \
+ /home/paul_/git/OpelXID/build/config/esp32/rev/min/full.cdep \
+ /home/paul_/git/OpelXID/build/config/libc/picolibc/newlib/compatibility.cdep
