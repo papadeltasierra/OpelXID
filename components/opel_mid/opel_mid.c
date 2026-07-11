@@ -82,6 +82,22 @@ static uint8_t apply_odd_parity(uint8_t data)
 /* ── Low-level bus ────────────────────────────────────────────────────────── */
 
 /**
+ * @brief Force the bus to the idle state (all lines high).
+ *
+ * Used during error recovery to ensure the bus is in a known, safe state
+ * before retrying or aborting transmission.
+ *
+ * @param cfg Device config.
+ */
+static void bus_reset_to_idle(const opel_mid_config_t *cfg)
+{
+    sda_high(cfg);
+    scl_high(cfg);
+    mrq_high(cfg);
+    ets_delay_us(T_MRQ_US);
+}
+
+/**
  * @brief Wait for the slave to drive SDA to the expected level, with timeout.
  *
  * Poll SDA at regular intervals until it matches @p expected or the timeout
@@ -133,11 +149,13 @@ static esp_err_t bus_start(const opel_mid_config_t *cfg)
     mrq_low(cfg);
     ets_delay_us(T_MRQ_US);
 
-    /* 2. Slave pulls SDA low (wait up to T1max) */
+    /* 2. Slave pulls SDA low (wait up to T1max = 15 ms).
+     *    Failure here means the display is not responding or bus is shorted. */
     esp_err_t ret = wait_sda(cfg, 0);
     if (ret != ESP_OK) {
-        mrq_high(cfg); /* Clean up on error */
-        return ret;
+        ESP_LOGE(TAG, "bus_start step 2 failed: slave did not pull SDA low");
+        bus_reset_to_idle(cfg);
+        return ESP_ERR_INVALID_RESPONSE; /* Slave not responding */
     }
     ets_delay_us(T_MRQ_US);
 
@@ -145,10 +163,13 @@ static esp_err_t bus_start(const opel_mid_config_t *cfg)
     mrq_high(cfg);
     ets_delay_us(T_MRQ_US);
 
-    /* 4. Slave releases SDA high (wait) */
+    /* 4. Slave releases SDA high (wait up to T_SDA_TIMEOUT_US = 15 ms).
+     *    Failure here means SDA is stuck low (short to ground). */
     ret = wait_sda(cfg, 1);
     if (ret != ESP_OK) {
-        return ret;
+        ESP_LOGE(TAG, "bus_start step 4 failed: SDA stuck low (possible short to ground)");
+        bus_reset_to_idle(cfg);
+        return ESP_ERR_INVALID_RESPONSE;
     }
     ets_delay_us(T_MRQ_US);
 
@@ -198,7 +219,11 @@ static esp_err_t bus_send_byte(const opel_mid_config_t *cfg, uint8_t byte)
         /* 3. Set SCL high */
         scl_high(cfg);
 
-        /* 4. Wait for slave to release SCL (clock stretching) with timeout */
+        /* 4. Wait for slave to release SCL (clock stretching) with timeout.
+         *    The slave may hold SCL low to signal "I'm busy", but must
+         *    release it within a reasonable time. Per the spec, SCL must
+         *    be high for at least T_SCL_HIGH_US (50 µs), so we use 1 ms
+         *    as a safety margin. If exceeded, this indicates a fault. */
         uint32_t stretch_timeout_us = 1000u; /* 1 ms */
         uint32_t elapsed_us = 0u;
         while (get_scl(cfg) == 0 && elapsed_us < stretch_timeout_us) {
@@ -206,7 +231,10 @@ static esp_err_t bus_send_byte(const opel_mid_config_t *cfg, uint8_t byte)
             elapsed_us += 10u;
         }
         if (elapsed_us >= stretch_timeout_us) {
-            ESP_LOGW(TAG, "SCL stretch timeout at bit %d", bit_idx);
+            /* SCL stuck low: slave is unresponsive or bus is shorted. */
+            ESP_LOGE(TAG, "SCL clock stretch timeout at bit %d (possibly shorted to ground)", bit_idx);
+            scl_high(cfg); /* Release SCL to try to recover */
+            return ESP_ERR_INVALID_RESPONSE;
         }
 
         ets_delay_us(T_SCL_HIGH_US);
@@ -520,16 +548,30 @@ esp_err_t opel_mid_send(opel_mid_handle_t         handle,
     esp_err_t ret;
 
     ret = bus_start(cfg);
-    if (ret != ESP_OK) { return ret; }
+    if (ret != ESP_OK) {
+        /* bus_start() calls bus_reset_to_idle() on error, so no cleanup needed */
+        ESP_LOGE(TAG, "opel_mid_send: bus_start() failed; frame transmission aborted");
+        return ret;
+    }
 
     /* 1. Slave address */
     ret = bus_send_byte_with_retry(cfg, addr_byte);
-    if (ret != ESP_OK) { bus_stop(cfg); return ret; }
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "opel_mid_send: address byte transmission failed (0x%02X)", addr_byte);
+        bus_stop(cfg);
+        bus_reset_to_idle(cfg); /* Extra recovery after stop */
+        return ret;
+    }
 
     /* 2. Symbol bytes (2 for TID-8, 3 for TID-10/MID) */
     for (uint8_t i = 0u; i < dev->sym_bytes; i++) {
         ret = bus_send_byte_with_retry(cfg, sym[i]);
-        if (ret != ESP_OK) { bus_stop(cfg); return ret; }
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "opel_mid_send: symbol byte %u transmission failed (0x%02X)", i, sym[i]);
+            bus_stop(cfg);
+            bus_reset_to_idle(cfg);
+            return ret;
+        }
     }
 
     /* 3. Data bytes — ASCII text, space-padded to display width */
@@ -537,8 +579,18 @@ esp_err_t opel_mid_send(opel_mid_handle_t         handle,
     for (uint8_t i = 0u; i < dev->data_bytes; i++) {
         char c = (i < text_len) ? text[i] : ' ';
         ret = bus_send_byte_with_retry(cfg, char_to_display_byte(c));
-        if (ret != ESP_OK) { bus_stop(cfg); return ret; }
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "opel_mid_send: data byte %u transmission failed (char='%c')", i, c);
+            bus_stop(cfg);
+            bus_reset_to_idle(cfg);
+            return ret;
+        }
     }
 
-    return bus_stop(cfg);
+    ret = bus_stop(cfg);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "opel_mid_send: bus_stop() failed");
+        bus_reset_to_idle(cfg);
+    }
+    return ret;
 }
