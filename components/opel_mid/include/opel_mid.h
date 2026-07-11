@@ -10,6 +10,16 @@ extern "C" {
 
 /* ── Display type ─────────────────────────────────────────────────────────── */
 
+/*
+ * Clock sub-address offsets (relative to the text slave address).
+ * These have been observed on the bus but are less rigorously documented
+ * than the text protocol.  Verify against your hardware.
+ *
+ * Reference: https://wiki.carluccio.de/index.php/Opel_TID (§Uhrzeit)
+ *   TID-8   clock address: 0x4C
+ *   TID-10  clock address: 0x4E
+ */
+
 /**
  * @brief Opel display variant.
  *
@@ -147,6 +157,30 @@ esp_err_t opel_mid_power_on(opel_mid_handle_t handle);
 esp_err_t opel_mid_send(opel_mid_handle_t          handle,
                         const char                *text,
                         const opel_mid_symbols_t  *symbols);
+
+/**
+ * @brief Set the time shown on the display clock segment.
+ *
+ * Sends a 2-byte clock frame to the display's clock sub-address
+ * (0x4C for TID-8, 0x4E for TID-10/MID).  The display renders the
+ * time independently of the text frame — both can coexist.
+ *
+ * @note The clock sub-address has been observed on the bus but is not
+ *       as thoroughly documented as the text protocol.  Verify the
+ *       displayed time against your hardware after first use.
+ *
+ * @param handle  Handle obtained from opel_mid_init().
+ * @param hours   Hour value (0–23).
+ * @param minutes Minute value (0–59).
+ *
+ * @return ESP_OK              on success.
+ * @return ESP_ERR_INVALID_ARG if @p handle is NULL, or @p hours / @p minutes
+ *                             are out of range.
+ * @return ESP_ERR_TIMEOUT     if the slave does not respond.
+ */
+esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
+                            uint8_t           hours,
+                            uint8_t           minutes);
 
 #ifdef __cplusplus
 }
