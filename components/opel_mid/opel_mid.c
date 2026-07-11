@@ -84,28 +84,44 @@ static uint8_t apply_odd_parity(uint8_t data)
 /**
  * @brief Wait for the slave to drive SDA to the expected level, with timeout.
  *
+ * Poll SDA at regular intervals until it matches @p expected or the timeout
+ * elapses. Used during bus handshakes to detect slave responses.
+ *
+ * Reference: §Datenübertragung (handshake timing T1min–T1max = 100 µs–15 ms).
+ *
  * @param cfg       Device config.
  * @param expected  1 = wait for SDA high, 0 = wait for SDA low.
  * @return ESP_OK on success, ESP_ERR_TIMEOUT if the slave does not respond.
  */
 static esp_err_t wait_sda(const opel_mid_config_t *cfg, int expected)
 {
-    /* TODO: implement wait loop with timeout */
-    (void)cfg;
-    (void)expected;
-    return ESP_OK;
+    uint32_t elapsed_us = 0u;
+    const uint32_t poll_interval_us = T_SDA_WAIT_US; /* 100 µs */
+
+    while (elapsed_us < T_SDA_TIMEOUT_US) {
+        int sda_level = get_sda(cfg);
+        if (sda_level == expected) {
+            return ESP_OK;
+        }
+        ets_delay_us(poll_interval_us);
+        elapsed_us += poll_interval_us;
+    }
+
+    ESP_LOGE(TAG, "wait_sda timeout: expected %d, got %d after %u µs",
+             expected, get_sda(cfg), elapsed_us);
+    return ESP_ERR_TIMEOUT;
 }
 
 /**
  * @brief Send the start-of-transmission handshake.
  *
- * Sequence (§Datenübertragung):
+ * Sequence (§Datenübertragung, steps 1–6):
  *   1. Master sets MRQ low
- *   2. Slave pulls SDA low          (wait up to T_SDA_TIMEOUT_US)
- *   3. Master sets MRQ high         (hold T_MRQ_US)
- *   4. Slave releases SDA high      (wait)
- *   5. Master pulls SDA low         (T4 ≥ 100 µs)
- *   6. Master pulls SCL low         (T6 ≥ 100 µs)
+ *   2. Slave pulls SDA low          (wait up to T_SDA_TIMEOUT_US, T1 = 100 µs–15 ms)
+ *   3. Master sets MRQ high         (hold ≥ 100 µs)
+ *   4. Slave releases SDA high      (wait T4 = 100 µs–200 µs)
+ *   5. Master pulls SDA low         (T5 = 100 µs–500 µs)
+ *   6. Master pulls SCL low         (T6 = 100 µs–200 µs)
  *   → Ready to clock out address byte.
  *
  * @param cfg Device config.
@@ -113,55 +129,153 @@ static esp_err_t wait_sda(const opel_mid_config_t *cfg, int expected)
  */
 static esp_err_t bus_start(const opel_mid_config_t *cfg)
 {
-    /* TODO: implement full handshake */
-    (void)cfg;
+    /* 1. Master sets MRQ low */
+    mrq_low(cfg);
+    ets_delay_us(T_MRQ_US);
+
+    /* 2. Slave pulls SDA low (wait up to T1max) */
+    esp_err_t ret = wait_sda(cfg, 0);
+    if (ret != ESP_OK) {
+        mrq_high(cfg); /* Clean up on error */
+        return ret;
+    }
+    ets_delay_us(T_MRQ_US);
+
+    /* 3. Master sets MRQ high */
+    mrq_high(cfg);
+    ets_delay_us(T_MRQ_US);
+
+    /* 4. Slave releases SDA high (wait) */
+    ret = wait_sda(cfg, 1);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    ets_delay_us(T_MRQ_US);
+
+    /* 5. Master pulls SDA low */
+    sda_low(cfg);
+    ets_delay_us(T_MRQ_US);
+
+    /* 6. Master pulls SCL low */
+    scl_low(cfg);
+    ets_delay_us(T_MRQ_US);
+
     return ESP_OK;
 }
 
 /**
- * @brief Clock out one byte MSB-first and read the slave ACK/parity bit.
- *
+ * @brief Clock out one byte MSB-first and read the slave ACK/parity bit.\n *
  * Bit transmission (§Bit Synchronisation):
- *   1. Drive SDA to bit value
- *   2. Wait Ts (5 µs setup)
- *   3. Set SCL high
- *   4. Set SCL low                  (hold T_SCL_HIGH_US ≥ 50 µs)
- *   5. Wait Th (5 µs hold)
- *   6. Drive next bit on SDA
- *   7. Wait remainder of T_SCL_LOW_US
- *   8. Set SCL high; wait for slave to stretch if needed
- *
- * After LSB, perform ACK cycle (§Bestätigung am Ende des Bytes):
- *   – Release SDA; slave asserts SDA low if parity OK, high on error.
- *
+ *   – For each of the 8 bits (MSB first):\n *       1. Drive SDA to bit value
+ *       2. Wait Ts (≥ 5 µs) for setup
+ *       3. Set SCL high
+ *       4. Wait for slave to release SCL (clock stretching) or timeout
+ *       5. Set SCL low, hold ≥ 50 µs (TSCLLmin)
+ *       6. Wait Th (≥ 5 µs) for hold before next bit\n *
+ * After all 8 bits, perform ACK cycle (§Bestätigung am Ende des Bytes):
+ *       7. Release SDA (pull high via open-drain)
+ *       8. Set SCL high
+ *       9. Wait ≥ 50 µs, then read SDA:\n *          – SDA low = ACK (parity OK)\n *          – SDA high = NACK (parity error)\n *      10. Set SCL low
+ *      11. SDA remains at slave's control momentarily, then revert to low\n *
  * @param cfg  Device config.
- * @param byte Byte to send (bit 0 must already contain the parity bit).
+ * @param byte Byte to send (bit 0 is parity, bits[7:1] are data).
  * @return ESP_OK on ACK, ESP_ERR_INVALID_RESPONSE on NACK/parity error.
  */
 static esp_err_t bus_send_byte(const opel_mid_config_t *cfg, uint8_t byte)
 {
-    /* TODO: implement bit-bang send with clock stretching and ACK check */
-    (void)cfg;
-    (void)byte;
-    return ESP_OK;
+    /* Send 8 bits, MSB first. */
+    for (int bit_idx = 7; bit_idx >= 0; --bit_idx) {
+        int bit_val = (byte >> bit_idx) & 1u;
+
+        /* 1. Drive SDA to bit value */
+        if (bit_val) {
+            sda_high(cfg);
+        } else {
+            sda_low(cfg);
+        }
+        ets_delay_us(T_SETUP_US);
+
+        /* 3. Set SCL high */
+        scl_high(cfg);
+
+        /* 4. Wait for slave to release SCL (clock stretching) with timeout */
+        uint32_t stretch_timeout_us = 1000u; /* 1 ms */
+        uint32_t elapsed_us = 0u;
+        while (get_scl(cfg) == 0 && elapsed_us < stretch_timeout_us) {
+            ets_delay_us(10u);
+            elapsed_us += 10u;
+        }
+        if (elapsed_us >= stretch_timeout_us) {
+            ESP_LOGW(TAG, "SCL stretch timeout at bit %d", bit_idx);
+        }
+
+        ets_delay_us(T_SCL_HIGH_US);
+
+        /* 5. Set SCL low */
+        scl_low(cfg);
+        ets_delay_us(T_SCL_LOW_US);
+
+        /* 6. Wait for hold time before next bit */
+        ets_delay_us(T_HOLD_US);
+    }
+
+    /* ── ACK cycle ─────────────────────────────────────────────────────────── */
+
+    /* 7. Release SDA (open-drain pull-up) */
+    sda_high(cfg);
+    ets_delay_us(T_SETUP_US);
+
+    /* 8. Set SCL high */
+    scl_high(cfg);
+    ets_delay_us(T_SCL_HIGH_US);
+
+    /* 9. Read ACK bit: slave pulls SDA low if parity OK, stays high on error */
+    int ack_bit = get_sda(cfg);
+
+    /* 10. Set SCL low */
+    scl_low(cfg);
+    ets_delay_us(T_SCL_LOW_US);
+
+    /* 11. Master reclaims SDA (open-drain pull-down) */
+    sda_low(cfg);
+    ets_delay_us(T_HOLD_US);
+
+    return (ack_bit == 0) ? ESP_OK : ESP_ERR_INVALID_RESPONSE;
 }
 
 /**
  * @brief Send the end-of-transmission sequence.
  *
  * Sequence (§Ende der Übertragung):
- *   9.  SDA low   (≥ 100 µs)
+ *    9. SDA low   (≥ 100 µs) — already held low from last bit
  *   10. MRQ high  (100 µs – 1 ms)
  *   11. SCL high  (≥ 100 µs)
  *   12. SDA high  (≥ 100 µs)
+ *
+ * After transmission completes, master must wait ≥ 100 µs before initiating
+ * the next bus_start() sequence (§Fehlerbehandlung).
  *
  * @param cfg Device config.
  * @return ESP_OK on success.
  */
 static esp_err_t bus_stop(const opel_mid_config_t *cfg)
 {
-    /* TODO: implement end-of-transmission sequence */
-    (void)cfg;
+    /* 9. SDA low (already held) */
+    sda_low(cfg);
+    ets_delay_us(T_MRQ_US);
+
+    /* 10. MRQ high */
+    mrq_high(cfg);
+    ets_delay_us(T_MRQ_US);
+
+    /* 11. SCL high */
+    scl_high(cfg);
+    ets_delay_us(T_MRQ_US);
+
+    /* 12. SDA high */
+    sda_high(cfg);
+    ets_delay_us(T_MRQ_US);
+
     return ESP_OK;
 }
 
@@ -285,18 +399,65 @@ esp_err_t opel_mid_power_on(opel_mid_handle_t handle)
     if (!handle) {
         return ESP_ERR_INVALID_ARG;
     }
+
+    struct opel_mid_dev_t   *dev = handle;
+    const opel_mid_config_t *cfg = &dev->config;
+
     /*
-     * TODO: implement the power-on test sequence (§Power on Test).
+     * Power-on test sequence (§Power on Test).
      *
-     * The master must send a specific pulse sequence on SCL and MRQ after the
-     * AA line goes high, within the timing window:
-     *   T1 (SCL pulse)    100 ms – 500 ms
-     *   T2 (MRQ pulse)    500 µs – 1 ms
-     *   T3 (gap to data)  1 ms   – 2 ms
+     * The master must send this pulse sequence on SCL and MRQ after the AA
+     * (Antenna Amplifier / radio-on) signal is asserted, before any data is
+     * exchanged. Timing:
+     *   T1 (SCL pulse duration)   100 ms – 500 ms
+     *   T2 (MRQ pulse duration)   500 µs – 1 ms
+     *   T3 (gap to first data)    1 ms   – 2 ms
      *
-     * This allows the slave to verify line integrity before data is exchanged.
+     * The slave detects this sequence and verifies line integrity:
+     *   – Constant low on any line → short to ground
+     *   – Constant high on any line → short to +Vbatt
+     *   – Signal appears on wrong line → cross-short between lines
+     *
+     * The sequence:
+     *   1. SCL high (release)
+     *   2. Wait T1 (≥ 100 ms)
+     *   3. SCL low (pull)
+     *   4. Wait T1 (≥ 100 ms)
+     *   5. SCL high (release)
+     *   6. MRQ low (pull)
+     *   7. Wait T2 (500 µs – 1 ms)
+     *   8. MRQ high (release)
+     *   9. Wait T3 (1 ms – 2 ms) before first bus_start()
      */
-    ESP_LOGW(TAG, "opel_mid_power_on: not yet implemented");
+
+    /* Ensure bus is idle-high before test */
+    scl_high(cfg);
+    sda_high(cfg);
+    mrq_high(cfg);
+
+    ESP_LOGI(TAG, "Power-on test: SCL pulse (T1=100ms)...");
+
+    /* T1: SCL low pulse (100 ms) */
+    scl_low(cfg);
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    /* Release SCL */
+    scl_high(cfg);
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    ESP_LOGI(TAG, "Power-on test: MRQ pulse (T2=500µs)...");
+
+    /* T2: MRQ low pulse (500 µs – 1 ms, use 1 ms for safety) */
+    mrq_low(cfg);
+    ets_delay_us(1000);
+
+    /* Release MRQ */
+    mrq_high(cfg);
+
+    /* T3: Gap before first data (1 ms – 2 ms) */
+    ets_delay_us(2000);
+
+    ESP_LOGI(TAG, "Power-on test complete");
     return ESP_OK;
 }
 
