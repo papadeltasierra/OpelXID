@@ -1,0 +1,49 @@
+menu "OpelXID Basic Text Configuration"
+
+choice OPEL_DISPLAY_TYPE
+    prompt "Display Type"
+    default OPEL_DISPLAY_TYPE_TID_10
+    help
+        Select the Opel/Vauxhall display variant to target.
+
+    config OPEL_DISPLAY_TYPE_TID_8
+        bool "TID-8 (Astra F, Corsa B, Tigra)"
+        help
+            8-digit Triple Info Display.
+            Slave address: 0x4A
+            Frame: 2 symbol bytes + 8 data bytes
+
+    config OPEL_DISPLAY_TYPE_TID_10
+        bool "TID-10 / MID (Astra G, Corsa C, MID)"
+        help
+            10-digit Triple Info Display or Multi Information Display.
+            Slave address: 0x4D
+            Frame: 3 symbol bytes + 10 data bytes
+
+endchoice
+
+config OPEL_DISPLAY_PIN_SDA
+    int "SDA (Data) GPIO Pin"
+    default 21
+    range 0 39
+    help
+        GPIO pin for SDA (serial data line).
+        Must be open-drain capable.
+
+config OPEL_DISPLAY_PIN_SCL
+    int "SCL (Clock) GPIO Pin"
+    default 22
+    range 0 39
+    help
+        GPIO pin for SCL (serial clock line).
+        Must be open-drain capable.
+
+config OPEL_DISPLAY_PIN_MRQ
+    int "MRQ (Master Request) GPIO Pin"
+    default 23
+    range 0 39
+    help
+        GPIO pin for MRQ (master request line).
+        Must be open-drain capable.
+
+endmenu

@@ -1,25 +1,32 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "driver/gpio.h"
 #include "opel_mid.h"
 
 static const char *TAG = "basic_text";
 
 /*
- * Adjust these pin assignments to match your wiring.
- * All three lines must be open-drain capable GPIOs.
+ * Display type and GPIO pins are configured via SDKCONFIG.
+ * Modify via: idf.py menuconfig -> OpelXID Basic Text Configuration
  */
-#define PIN_SDA  GPIO_NUM_21
-#define PIN_SCL  GPIO_NUM_22
-#define PIN_MRQ  GPIO_NUM_23
+#ifdef CONFIG_OPEL_DISPLAY_TYPE_TID_8
+#define DISPLAY_TYPE OPEL_MID_TYPE_TID_8
+#else
+#define DISPLAY_TYPE OPEL_MID_TYPE_TID_10
+#endif
+
+#define PIN_SDA  CONFIG_OPEL_DISPLAY_PIN_SDA
+#define PIN_SCL  CONFIG_OPEL_DISPLAY_PIN_SCL
+#define PIN_MRQ  CONFIG_OPEL_DISPLAY_PIN_MRQ
 
 void app_main(void)
 {
     opel_mid_config_t config = {
-        .pin_sda = PIN_SDA,
-        .pin_scl = PIN_SCL,
-        .pin_mrq = PIN_MRQ,
-        .type    = OPEL_MID_TYPE_TID_10,
+        .pin_sda = (gpio_num_t)PIN_SDA,
+        .pin_scl = (gpio_num_t)PIN_SCL,
+        .pin_mrq = (gpio_num_t)PIN_MRQ,
+        .type    = DISPLAY_TYPE,
     };
 
     opel_mid_handle_t display = NULL;
