@@ -28,8 +28,12 @@ void app_main(void)
     /* Send power-on test sequence (must be called after AA line goes high). */
     ESP_ERROR_CHECK(opel_mid_power_on(display));
 
-    /* Symbols: all off. */
-    opel_mid_symbols_t symbols = { .radio = 0, .tape = 0, .cd = 0 };
+    /* Show RDS and Stereo icons active; all tape/CD icons off. */
+    opel_mid_symbols_t symbols = {
+        .radio = OPEL_MID_SYM_RDS | OPEL_MID_SYM_STEREO,
+        .tape  = 0,
+        .cd    = 0,
+    };
 
     while (1) {
         ESP_LOGI(TAG, "Sending text to display");

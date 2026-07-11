@@ -168,20 +168,20 @@ static esp_err_t bus_stop(const opel_mid_config_t *cfg)
 /**
  * @brief Send one byte with automatic retry on parity error.
  *
- * Retries up to OPEL_MID_MAX_RETRIES times; on final failure the
- * caller should issue bus_stop() and display will show blank characters
+ * Retries up to OPEL_MID_MAX_RETRIES times; on final failure the caller
+ * should issue bus_stop() — the display will show blank characters
  * (§Fehlerbehandlung).
  *
  * @param cfg  Device config.
- * @param byte Byte to send (without parity; parity is applied here).
+ * @param byte Fully-formed byte: data in bits[7:1], odd parity in bit[0].
+ *             Use apply_odd_parity() or char_to_display_byte() to build it.
  * @return ESP_OK on success, ESP_ERR_INVALID_RESPONSE after all retries.
  */
 static esp_err_t bus_send_byte_with_retry(const opel_mid_config_t *cfg,
                                           uint8_t                  byte)
 {
-    uint8_t framed = apply_odd_parity(byte << 1u); /* shift data to bits[7:1] */
     for (unsigned i = 0u; i < OPEL_MID_MAX_RETRIES; i++) {
-        esp_err_t ret = bus_send_byte(cfg, framed);
+        esp_err_t ret = bus_send_byte(cfg, byte);
         if (ret == ESP_OK) {
             return ESP_OK;
         }
@@ -189,6 +189,29 @@ static esp_err_t bus_send_byte_with_retry(const opel_mid_config_t *cfg,
                  byte, i + 1u, OPEL_MID_MAX_RETRIES);
     }
     return ESP_ERR_INVALID_RESPONSE;
+}
+
+/**
+ * @brief Encode an ASCII character as a display byte ready for transmission.
+ *
+ * Each byte on the bus carries 7 data bits in bits[7:1] and an odd parity
+ * bit in bit[0].  The display's character set maps 1-to-1 to ASCII: the
+ * 7-bit ASCII code is placed directly into bits[7:1].
+ *
+ * Verified against observed wire values, e.g.:
+ *   'A' (0x41) → 0x83   'B' (0x42) → 0x85   ' ' (0x20) → 0x40
+ *
+ * Characters outside the printable ASCII range (0x20–0x7E) are substituted
+ * with a space.
+ *
+ * @param c  ASCII character.
+ * @return   Byte with data in bits[7:1] and odd parity in bit[0].
+ */
+static uint8_t char_to_display_byte(char c)
+{
+    uint8_t ascii = ((uint8_t)c >= 0x20u && (uint8_t)c <= 0x7Eu)
+                    ? (uint8_t)c : 0x20u;
+    return apply_odd_parity((uint8_t)(ascii << 1u));
 }
 
 /* ── Public API ───────────────────────────────────────────────────────────── */
@@ -285,22 +308,76 @@ esp_err_t opel_mid_send(opel_mid_handle_t         handle,
         return ESP_ERR_INVALID_ARG;
     }
 
+    struct opel_mid_dev_t   *dev = handle;
+    const opel_mid_config_t *cfg = &dev->config;
+
+    /* Default to all symbols off when caller passes NULL. */
+    static const opel_mid_symbols_t no_symbols = {0u, 0u, 0u};
+    if (!symbols) {
+        symbols = &no_symbols;
+    }
+
     /*
-     * TODO: implement full frame transmission.
+     * Build the three symbol bytes.
      *
-     * Frame layout (§Format einer Nachricht):
-     *   1. bus_start()                          – MRQ/SDA handshake
-     *   2. bus_send_byte_with_retry(addr)        – slave address
-     *   3. bus_send_byte_with_retry(radio_sym)   – Radio status byte  }
-     *   4. bus_send_byte_with_retry(tape_sym)    – Tape  status byte  } symbol bytes
-     *  [5. bus_send_byte_with_retry(cd_sym)]     – CD    status byte  } (10-digit only)
-     *   6..N. bus_send_byte_with_retry(char[i])  – data bytes (space-padded)
-     *   N+1. bus_stop()                          – end-of-transmission
+     * Each symbol byte layout (bit 0 = parity, per §Format der Status-Bytes):
      *
-     * Character encoding: each ASCII character is mapped to a 7-bit display
-     * code before parity is applied. Mapping table to be added.
+     *   Radio Status (byte 1)
+     *     bit 7  COMMA          bit 6  RDS
+     *     bit 5  TP             bit 4  STEREO
+     *     bit 3  0              bit 2  AS
+     *     bit 1  TP_BRACKET     bit 0  parity
+     *
+     *   Tape Status (byte 2)
+     *     bit 7  CD_IN          bit 6  DOLBY_C
+     *     bit 5  DOLBY_B        bit 4  CR
+     *     bit 3  CPS            bit 2  0
+     *     bit 1  0              bit 0  parity
+     *
+     *   CD Status (byte 3, 10-digit only)
+     *     bit 7  0              bit 6  TRACK
+     *     bit 5  RDM            bit 4  PGM
+     *     bit 3  DISC           bit 2  0
+     *     bit 1  0              bit 0  parity
+     *
+     * apply_odd_parity() treats bits[7:1] as data and computes bit[0],
+     * so we mask off bit 0 of the caller-supplied flags before passing in.
      */
-    ESP_LOGW(TAG, "opel_mid_send: not yet implemented (text=\"%s\")", text);
-    (void)symbols;
-    return ESP_OK;
+    uint8_t sym[3] = {
+        apply_odd_parity(symbols->radio & 0xFEu), /* Radio Status */
+        apply_odd_parity(symbols->tape  & 0xFEu), /* Tape  Status */
+        apply_odd_parity(symbols->cd    & 0xFEu), /* CD    Status (10-digit only) */
+    };
+
+    /*
+     * Address byte: the 7-bit slave address is placed in bits[7:1] and odd
+     * parity applied to bit[0], consistent with all other bus bytes.
+     */
+    uint8_t addr_byte = apply_odd_parity((uint8_t)(dev->addr << 1u));
+
+    /* ── Transmit frame (§Format einer Nachricht) ─────────────────────────── */
+    esp_err_t ret;
+
+    ret = bus_start(cfg);
+    if (ret != ESP_OK) { return ret; }
+
+    /* 1. Slave address */
+    ret = bus_send_byte_with_retry(cfg, addr_byte);
+    if (ret != ESP_OK) { bus_stop(cfg); return ret; }
+
+    /* 2. Symbol bytes (2 for TID-8, 3 for TID-10/MID) */
+    for (uint8_t i = 0u; i < dev->sym_bytes; i++) {
+        ret = bus_send_byte_with_retry(cfg, sym[i]);
+        if (ret != ESP_OK) { bus_stop(cfg); return ret; }
+    }
+
+    /* 3. Data bytes — ASCII text, space-padded to display width */
+    size_t text_len = strlen(text);
+    for (uint8_t i = 0u; i < dev->data_bytes; i++) {
+        char c = (i < text_len) ? text[i] : ' ';
+        ret = bus_send_byte_with_retry(cfg, char_to_display_byte(c));
+        if (ret != ESP_OK) { bus_stop(cfg); return ret; }
+    }
+
+    return bus_stop(cfg);
 }
