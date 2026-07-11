@@ -1,0 +1,3 @@
+version: "0.1.0"
+description: "ESP-IDF library for Vauxhall/Opel MID and TID displays"
+url: "https://github.com/paulwilljones/OpelXID"
