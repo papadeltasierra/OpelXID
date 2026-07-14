@@ -12,6 +12,8 @@
 
 static const char *TAG = "demonstration";
 
+#define INPUT_RETRY_DELAY_MS 20
+
 /* ── Configuration ────────────────────────────────────────────────────────── */
 
 /**
@@ -183,6 +185,28 @@ static void wait_for_return(void)
 static int get_display_width(opel_mid_type_t type)
 {
     return (type == OPEL_MID_TYPE_TID_8) ? 8 : 10;
+}
+
+/**
+ * @brief Read one line from stdin, retrying on transient input errors.
+ */
+static int read_line_blocking(char *buffer, size_t buffer_len)
+{
+    if (buffer == NULL || buffer_len == 0u)
+    {
+        return 0;
+    }
+
+    while (1)
+    {
+        if (fgets(buffer, buffer_len, stdin) != NULL)
+        {
+            return 1;
+        }
+
+        clearerr(stdin);
+        vTaskDelay(pdMS_TO_TICKS(INPUT_RETRY_DELAY_MS));
+    }
 }
 
 /**
@@ -635,7 +659,7 @@ static void demo_time_sync(opel_mid_handle_t display)
     printf("Timestamp: ");
     fflush(stdout);
 
-    if (fgets(input, sizeof(input), stdin) == NULL)
+    if (!read_line_blocking(input, sizeof(input)))
     {
         printf("Input error.\n");
         return;
@@ -678,11 +702,11 @@ static void main_menu(opel_mid_handle_t display, opel_mid_type_t type)
     printf("║   OpelXID MID/TID Demonstration Menu   ║\n");
     printf("╠════════════════════════════════════════╣\n");
     printf("║ 1. Character Set (all printable ASCII) ║\n");
-    printf("║ 2. Non-printable codes (0x00–0x1F,7F) ║\n");
-    printf("║ 3. All Symbols (Radio/Tape/CD)        ║\n");
+    printf("║ 2. Non-printable codes (0x00–0x1F,7F)  ║\n");
+    printf("║ 3. All Symbols (Radio/Tape/CD)         ║\n");
     printf("║ 4. Edge Cases                          ║\n");
-    printf("║ 5. Run All Demonstrations             ║\n");
-    printf("║ 6. Time Sync (UTC timestamp)          ║\n");
+    printf("║ 5. Run All Demonstrations              ║\n");
+    printf("║ 6. Time Sync (UTC timestamp)           ║\n");
     printf("║ 7. Exit                                ║\n");
     printf("╚════════════════════════════════════════╝\n");
     printf("Display type: %s (%d characters)\n\n",
@@ -695,8 +719,9 @@ static void main_menu(opel_mid_handle_t display, opel_mid_type_t type)
         fflush(stdout);
 
         char input[16];
-        if (fgets(input, sizeof(input), stdin) == NULL)
+        if (!read_line_blocking(input, sizeof(input)))
         {
+            printf("Input error.\n");
             continue;
         }
 
