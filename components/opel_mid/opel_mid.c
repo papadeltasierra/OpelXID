@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "rom/ets_sys.h"
@@ -11,49 +13,50 @@ static const char *TAG = "opel_mid";
 
 /* ── Constants ────────────────────────────────────────────────────────────── */
 
-#define OPEL_MID_ADDR_TID_8       0x4Au
-#define OPEL_MID_ADDR_TID_10      0x4Du
+#define OPEL_MID_ADDR_TID_8 0x4Au
+#define OPEL_MID_ADDR_TID_10 0x4Du
 
-#define OPEL_MID_DATA_BYTES_8   8u
-#define OPEL_MID_DATA_BYTES_10  10u
-#define OPEL_MID_SYM_BYTES_8    2u
-#define OPEL_MID_SYM_BYTES_10   3u
+#define OPEL_MID_DATA_BYTES_8 8u
+#define OPEL_MID_DATA_BYTES_10 10u
+#define OPEL_MID_SYM_BYTES_8 2u
+#define OPEL_MID_SYM_BYTES_10 3u
 
 /** Maximum send retries per byte on parity error (§Fehlerbehandlung). */
-#define OPEL_MID_MAX_RETRIES    3u
+#define OPEL_MID_MAX_RETRIES 3u
 
 /*
  * Timing (microseconds). Values are taken from the timing tables on
  * https://wiki.carluccio.de/index.php/Opel_TID.
  * Minimums are used throughout; increase if the display proves unreliable.
  */
-#define T_SCL_HIGH_US    50u  /* TSCLHmin */
-#define T_SCL_LOW_US     50u  /* TSCLLmin */
-#define T_SETUP_US        5u  /* Ts (data setup before SCL high) */
-#define T_HOLD_US         5u  /* Th (data hold after SCL low) */
-#define T_MRQ_US        100u  /* Generic MRQ pulse width */
-#define T_SDA_WAIT_US   100u  /* Poll interval waiting for slave SDA response */
+#define T_SCL_HIGH_US 50u       /* TSCLHmin */
+#define T_SCL_LOW_US 50u        /* TSCLLmin */
+#define T_SETUP_US 5u           /* Ts (data setup before SCL high) */
+#define T_HOLD_US 5u            /* Th (data hold after SCL low) */
+#define T_MRQ_US 100u           /* Generic MRQ pulse width */
+#define T_SDA_WAIT_US 100u      /* Poll interval waiting for slave SDA response */
 #define T_SDA_TIMEOUT_US 15000u /* T1max: slave must respond within 15 ms */
 
 /* ── Device structure ─────────────────────────────────────────────────────── */
 
-struct opel_mid_dev_t {
+struct opel_mid_dev_t
+{
     opel_mid_config_t config;
-    uint8_t           addr;
-    uint8_t           sym_bytes;
-    uint8_t           data_bytes;
+    uint8_t addr;
+    uint8_t sym_bytes;
+    uint8_t data_bytes;
 };
 
 /* ── GPIO helpers ─────────────────────────────────────────────────────────── */
 
 static inline void sda_high(const opel_mid_config_t *c) { gpio_set_level(c->pin_sda, 1); }
-static inline void sda_low (const opel_mid_config_t *c) { gpio_set_level(c->pin_sda, 0); }
+static inline void sda_low(const opel_mid_config_t *c) { gpio_set_level(c->pin_sda, 0); }
 static inline void scl_high(const opel_mid_config_t *c) { gpio_set_level(c->pin_scl, 1); }
-static inline void scl_low (const opel_mid_config_t *c) { gpio_set_level(c->pin_scl, 0); }
+static inline void scl_low(const opel_mid_config_t *c) { gpio_set_level(c->pin_scl, 0); }
 static inline void mrq_high(const opel_mid_config_t *c) { gpio_set_level(c->pin_mrq, 1); }
-static inline void mrq_low (const opel_mid_config_t *c) { gpio_set_level(c->pin_mrq, 0); }
-static inline int  get_sda (const opel_mid_config_t *c) { return gpio_get_level(c->pin_sda); }
-static inline int  get_scl (const opel_mid_config_t *c) { return gpio_get_level(c->pin_scl); }
+static inline void mrq_low(const opel_mid_config_t *c) { gpio_set_level(c->pin_mrq, 0); }
+static inline int get_sda(const opel_mid_config_t *c) { return gpio_get_level(c->pin_sda); }
+static inline int get_scl(const opel_mid_config_t *c) { return gpio_get_level(c->pin_scl); }
 
 /* ── Parity ───────────────────────────────────────────────────────────────── */
 
@@ -71,7 +74,8 @@ static uint8_t apply_odd_parity(uint8_t data)
     /* Work on bits [7:1] only */
     uint8_t v = (data >> 1) & 0x7Fu;
     uint8_t ones = 0u;
-    while (v) {
+    while (v)
+    {
         ones += v & 1u;
         v >>= 1u;
     }
@@ -114,9 +118,11 @@ static esp_err_t wait_sda(const opel_mid_config_t *cfg, int expected)
     uint32_t elapsed_us = 0u;
     const uint32_t poll_interval_us = T_SDA_WAIT_US; /* 100 µs */
 
-    while (elapsed_us < T_SDA_TIMEOUT_US) {
+    while (elapsed_us < T_SDA_TIMEOUT_US)
+    {
         int sda_level = get_sda(cfg);
-        if (sda_level == expected) {
+        if (sda_level == expected)
+        {
             return ESP_OK;
         }
         ets_delay_us(poll_interval_us);
@@ -152,7 +158,8 @@ static esp_err_t bus_start(const opel_mid_config_t *cfg)
     /* 2. Slave pulls SDA low (wait up to T1max = 15 ms).
      *    Failure here means the display is not responding or bus is shorted. */
     esp_err_t ret = wait_sda(cfg, 0);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "bus_start step 2 failed: slave did not pull SDA low");
         bus_reset_to_idle(cfg);
         return ESP_ERR_INVALID_RESPONSE; /* Slave not responding */
@@ -166,7 +173,8 @@ static esp_err_t bus_start(const opel_mid_config_t *cfg)
     /* 4. Slave releases SDA high (wait up to T_SDA_TIMEOUT_US = 15 ms).
      *    Failure here means SDA is stuck low (short to ground). */
     ret = wait_sda(cfg, 1);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "bus_start step 4 failed: SDA stuck low (possible short to ground)");
         bus_reset_to_idle(cfg);
         return ESP_ERR_INVALID_RESPONSE;
@@ -205,13 +213,17 @@ static esp_err_t bus_start(const opel_mid_config_t *cfg)
 static esp_err_t bus_send_byte(const opel_mid_config_t *cfg, uint8_t byte)
 {
     /* Send 8 bits, MSB first. */
-    for (int bit_idx = 7; bit_idx >= 0; --bit_idx) {
+    for (int bit_idx = 7; bit_idx >= 0; --bit_idx)
+    {
         int bit_val = (byte >> bit_idx) & 1u;
 
         /* 1. Drive SDA to bit value */
-        if (bit_val) {
+        if (bit_val)
+        {
             sda_high(cfg);
-        } else {
+        }
+        else
+        {
             sda_low(cfg);
         }
         ets_delay_us(T_SETUP_US);
@@ -226,11 +238,13 @@ static esp_err_t bus_send_byte(const opel_mid_config_t *cfg, uint8_t byte)
          *    as a safety margin. If exceeded, this indicates a fault. */
         uint32_t stretch_timeout_us = 1000u; /* 1 ms */
         uint32_t elapsed_us = 0u;
-        while (get_scl(cfg) == 0 && elapsed_us < stretch_timeout_us) {
+        while (get_scl(cfg) == 0 && elapsed_us < stretch_timeout_us)
+        {
             ets_delay_us(10u);
             elapsed_us += 10u;
         }
-        if (elapsed_us >= stretch_timeout_us) {
+        if (elapsed_us >= stretch_timeout_us)
+        {
             /* SCL stuck low: slave is unresponsive or bus is shorted. */
             ESP_LOGE(TAG, "SCL clock stretch timeout at bit %d (possibly shorted to ground)", bit_idx);
             scl_high(cfg); /* Release SCL to try to recover */
@@ -320,11 +334,13 @@ static esp_err_t bus_stop(const opel_mid_config_t *cfg)
  * @return ESP_OK on success, ESP_ERR_INVALID_RESPONSE after all retries.
  */
 static esp_err_t bus_send_byte_with_retry(const opel_mid_config_t *cfg,
-                                          uint8_t                  byte)
+                                          uint8_t byte)
 {
-    for (unsigned i = 0u; i < OPEL_MID_MAX_RETRIES; i++) {
+    for (unsigned i = 0u; i < OPEL_MID_MAX_RETRIES; i++)
+    {
         esp_err_t ret = bus_send_byte(cfg, byte);
-        if (ret == ESP_OK) {
+        if (ret == ESP_OK)
+        {
             return ESP_OK;
         }
         ESP_LOGW(TAG, "Parity error on byte 0x%02X, retry %u/%u",
@@ -352,33 +368,39 @@ static esp_err_t bus_send_byte_with_retry(const opel_mid_config_t *cfg,
 static uint8_t char_to_display_byte(char c)
 {
     uint8_t ascii = ((uint8_t)c >= 0x20u && (uint8_t)c <= 0x7Eu)
-                    ? (uint8_t)c : 0x20u;
+                        ? (uint8_t)c
+                        : 0x20u;
     return apply_odd_parity((uint8_t)(ascii << 1u));
 }
 
 /* ── Public API ───────────────────────────────────────────────────────────── */
 
 esp_err_t opel_mid_init(const opel_mid_config_t *config,
-                        opel_mid_handle_t       *out_handle)
+                        opel_mid_handle_t *out_handle)
 {
-    if (!config || !out_handle) {
+    if (!config || !out_handle)
+    {
         return ESP_ERR_INVALID_ARG;
     }
 
     struct opel_mid_dev_t *dev = calloc(1u, sizeof(*dev));
-    if (!dev) {
+    if (!dev)
+    {
         return ESP_ERR_NO_MEM;
     }
 
     dev->config = *config;
 
-    if (config->type == OPEL_MID_TYPE_TID_8) {
-        dev->addr       = OPEL_MID_ADDR_TID_8;
-        dev->sym_bytes  = OPEL_MID_SYM_BYTES_8;
+    if (config->type == OPEL_MID_TYPE_TID_8)
+    {
+        dev->addr = OPEL_MID_ADDR_TID_8;
+        dev->sym_bytes = OPEL_MID_SYM_BYTES_8;
         dev->data_bytes = OPEL_MID_DATA_BYTES_8;
-    } else {
-        dev->addr       = OPEL_MID_ADDR_TID_10;
-        dev->sym_bytes  = OPEL_MID_SYM_BYTES_10;
+    }
+    else
+    {
+        dev->addr = OPEL_MID_ADDR_TID_10;
+        dev->sym_bytes = OPEL_MID_SYM_BYTES_10;
         dev->data_bytes = OPEL_MID_DATA_BYTES_10;
     }
 
@@ -389,14 +411,15 @@ esp_err_t opel_mid_init(const opel_mid_config_t *config,
         .pin_bit_mask = (1ULL << config->pin_sda) |
                         (1ULL << config->pin_scl) |
                         (1ULL << config->pin_mrq),
-        .mode         = GPIO_MODE_OUTPUT_OD,
-        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .mode = GPIO_MODE_OUTPUT_OD,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type    = GPIO_INTR_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
     };
 
     esp_err_t ret = gpio_config(&io);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         free(dev);
         return ret;
     }
@@ -415,7 +438,8 @@ esp_err_t opel_mid_init(const opel_mid_config_t *config,
 
 esp_err_t opel_mid_deinit(opel_mid_handle_t handle)
 {
-    if (!handle) {
+    if (!handle)
+    {
         return ESP_ERR_INVALID_ARG;
     }
     free(handle);
@@ -424,11 +448,12 @@ esp_err_t opel_mid_deinit(opel_mid_handle_t handle)
 
 esp_err_t opel_mid_power_on(opel_mid_handle_t handle)
 {
-    if (!handle) {
+    if (!handle)
+    {
         return ESP_ERR_INVALID_ARG;
     }
 
-    struct opel_mid_dev_t   *dev = handle;
+    struct opel_mid_dev_t *dev = handle;
     const opel_mid_config_t *cfg = &dev->config;
 
     /*
@@ -489,20 +514,22 @@ esp_err_t opel_mid_power_on(opel_mid_handle_t handle)
     return ESP_OK;
 }
 
-esp_err_t opel_mid_send(opel_mid_handle_t         handle,
-                        const char               *text,
+esp_err_t opel_mid_send(opel_mid_handle_t handle,
+                        const char *text,
                         const opel_mid_symbols_t *symbols)
 {
-    if (!handle || !text) {
+    if (!handle || !text)
+    {
         return ESP_ERR_INVALID_ARG;
     }
 
-    struct opel_mid_dev_t   *dev = handle;
+    struct opel_mid_dev_t *dev = handle;
     const opel_mid_config_t *cfg = &dev->config;
 
     /* Default to all symbols off when caller passes NULL. */
     static const opel_mid_symbols_t no_symbols = {0u, 0u, 0u};
-    if (!symbols) {
+    if (!symbols)
+    {
         symbols = &no_symbols;
     }
 
@@ -534,8 +561,8 @@ esp_err_t opel_mid_send(opel_mid_handle_t         handle,
      */
     uint8_t sym[3] = {
         apply_odd_parity(symbols->radio & 0xFEu), /* Radio Status */
-        apply_odd_parity(symbols->tape  & 0xFEu), /* Tape  Status */
-        apply_odd_parity(symbols->cd    & 0xFEu), /* CD    Status (10-digit only) */
+        apply_odd_parity(symbols->tape & 0xFEu),  /* Tape  Status */
+        apply_odd_parity(symbols->cd & 0xFEu),    /* CD    Status (10-digit only) */
     };
 
     /*
@@ -548,7 +575,8 @@ esp_err_t opel_mid_send(opel_mid_handle_t         handle,
     esp_err_t ret;
 
     ret = bus_start(cfg);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         /* bus_start() calls bus_reset_to_idle() on error, so no cleanup needed */
         ESP_LOGE(TAG, "opel_mid_send: bus_start() failed; frame transmission aborted");
         return ret;
@@ -556,7 +584,8 @@ esp_err_t opel_mid_send(opel_mid_handle_t         handle,
 
     /* 1. Slave address */
     ret = bus_send_byte_with_retry(cfg, addr_byte);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "opel_mid_send: address byte transmission failed (0x%02X)", addr_byte);
         bus_stop(cfg);
         bus_reset_to_idle(cfg); /* Extra recovery after stop */
@@ -564,9 +593,11 @@ esp_err_t opel_mid_send(opel_mid_handle_t         handle,
     }
 
     /* 2. Symbol bytes (2 for TID-8, 3 for TID-10/MID) */
-    for (uint8_t i = 0u; i < dev->sym_bytes; i++) {
+    for (uint8_t i = 0u; i < dev->sym_bytes; i++)
+    {
         ret = bus_send_byte_with_retry(cfg, sym[i]);
-        if (ret != ESP_OK) {
+        if (ret != ESP_OK)
+        {
             ESP_LOGE(TAG, "opel_mid_send: symbol byte %u transmission failed (0x%02X)", i, sym[i]);
             bus_stop(cfg);
             bus_reset_to_idle(cfg);
@@ -576,10 +607,12 @@ esp_err_t opel_mid_send(opel_mid_handle_t         handle,
 
     /* 3. Data bytes — ASCII text, space-padded to display width */
     size_t text_len = strlen(text);
-    for (uint8_t i = 0u; i < dev->data_bytes; i++) {
+    for (uint8_t i = 0u; i < dev->data_bytes; i++)
+    {
         char c = (i < text_len) ? text[i] : ' ';
         ret = bus_send_byte_with_retry(cfg, char_to_display_byte(c));
-        if (ret != ESP_OK) {
+        if (ret != ESP_OK)
+        {
             ESP_LOGE(TAG, "opel_mid_send: data byte %u transmission failed (char='%c')", i, c);
             bus_stop(cfg);
             bus_reset_to_idle(cfg);
@@ -588,7 +621,8 @@ esp_err_t opel_mid_send(opel_mid_handle_t         handle,
     }
 
     ret = bus_stop(cfg);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "opel_mid_send: bus_stop() failed");
         bus_reset_to_idle(cfg);
     }
@@ -596,56 +630,62 @@ esp_err_t opel_mid_send(opel_mid_handle_t         handle,
 }
 
 esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
-                            uint8_t           day,
-                            uint8_t           month,
-                            uint8_t           year,
-                            uint8_t           hours,
-                            uint8_t           minutes)
+                            uint8_t day,
+                            uint8_t month,
+                            uint8_t year,
+                            uint8_t hours,
+                            uint8_t minutes)
 {
-    if (!handle) {
+    if (!handle)
+    {
         return ESP_ERR_INVALID_ARG;
     }
     if (day < 1u || day > 31u || month < 1u || month > 12u || year > 99u ||
-        hours > 23u || minutes > 59u) {
+        hours > 23u || minutes > 59u)
+    {
         ESP_LOGE(TAG, "opel_mid_set_time: invalid datetime %02u-%02u-%02u %02u:%02u",
                  day, month, year, hours, minutes);
         return ESP_ERR_INVALID_ARG;
     }
 
-    struct opel_mid_dev_t   *dev = handle;
+    struct opel_mid_dev_t *dev = handle;
     const opel_mid_config_t *cfg = &dev->config;
 
     /* Hardware time-sync frame (13 bytes) using command 0x60. */
     uint8_t frame[13] = {0};
-    frame[0]  = (dev->addr == OPEL_MID_ADDR_TID_8) ? 0x10u : 0x12u;
-    frame[1]  = 0x60u;
-    frame[2]  = 0x00u;
-    frame[3]  = 0x00u;
-    frame[4]  = 0x00u;
-    frame[5]  = day;
-    frame[6]  = month;
-    frame[7]  = year;
-    frame[8]  = hours;
-    frame[9]  = minutes;
+    frame[0] = (dev->addr == OPEL_MID_ADDR_TID_8) ? 0x10u : 0x12u;
+    frame[1] = 0x60u;
+    frame[2] = 0x00u;
+    frame[3] = 0x00u;
+    frame[4] = 0x00u;
+    frame[5] = day;
+    frame[6] = month;
+    frame[7] = year;
+    frame[8] = hours;
+    frame[9] = minutes;
     frame[10] = 0x00u;
     frame[11] = 0x00u;
 
     /* Inverted XOR checksum over bytes 0..11. */
     uint8_t checksum = 0u;
-    for (size_t i = 0u; i < 12u; i++) {
+    for (size_t i = 0u; i < 12u; i++)
+    {
         checksum ^= frame[i];
     }
     frame[12] = (uint8_t)~checksum;
 
     esp_err_t ret = bus_start(cfg);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "opel_mid_set_time: bus_start() failed");
         return ret;
     }
 
-    for (size_t i = 0u; i < sizeof(frame); i++) {
+    for (size_t i = 0u; i < sizeof(frame); i++)
+    {
         ret = bus_send_byte_with_retry(cfg, frame[i]);
-        if (ret != ESP_OK) {
+        if (ret != ESP_OK)
+        {
             ESP_LOGE(TAG, "opel_mid_set_time: frame byte %u failed (0x%02X)", (unsigned)i, frame[i]);
             bus_stop(cfg);
             bus_reset_to_idle(cfg);
@@ -654,7 +694,8 @@ esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
     }
 
     ret = bus_stop(cfg);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "opel_mid_set_time: bus_stop() failed");
         bus_reset_to_idle(cfg);
         return ret;

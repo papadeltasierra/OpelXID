@@ -24,9 +24,13 @@ static const char *TAG = "demonstration";
 #define DISPLAY_TYPE OPEL_MID_TYPE_TID_10
 #endif
 
-#define PIN_SDA  CONFIG_OPEL_DISPLAY_PIN_SDA
-#define PIN_SCL  CONFIG_OPEL_DISPLAY_PIN_SCL
-#define PIN_MRQ  CONFIG_OPEL_DISPLAY_PIN_MRQ
+#define PIN_SDA CONFIG_OPEL_DISPLAY_PIN_SDA
+#define PIN_SCL CONFIG_OPEL_DISPLAY_PIN_SCL
+#define PIN_MRQ CONFIG_OPEL_DISPLAY_PIN_MRQ
+
+#if CONFIG_OPEL_DISPLAY_LEVEL_SHIFTER_OE_ENABLED
+#define PIN_OE CONFIG_OPEL_DISPLAY_PIN_OE
+#endif
 
 /* ── Character mapping table (Option 3) ───────────────────────────────────── */
 
@@ -43,7 +47,8 @@ static const char *TAG = "demonstration";
  *   3. Per-application customization (e.g., if a specific vehicle supports
  *      additional segment-based characters)
  */
-typedef struct {
+typedef struct
+{
     uint8_t code;        /* Display code (what's sent on the bus) */
     const char *display; /* What it shows on the actual hardware */
     const char *note;    /* Notes (ASCII range, custom segment, etc.) */
@@ -166,7 +171,8 @@ static void wait_for_return(void)
     printf("Press <return> to continue...\n");
     fflush(stdout);
     int c;
-    do {
+    do
+    {
         c = fgetc(stdin);
     } while (c != '\n' && c != '\r' && c != EOF);
 }
@@ -185,8 +191,10 @@ static int get_display_width(opel_mid_type_t type)
 static int parse_decimal_n(const char *s, size_t n, int *out)
 {
     int v = 0;
-    for (size_t i = 0; i < n; i++) {
-        if (!isdigit((unsigned char)s[i])) {
+    for (size_t i = 0; i < n; i++)
+    {
+        if (!isdigit((unsigned char)s[i]))
+        {
             return 0;
         }
         v = (v * 10) + (s[i] - '0');
@@ -206,7 +214,8 @@ static int parse_utc_timestamp(const char *ts,
                                int *minute,
                                int *second)
 {
-    if (!ts || strlen(ts) != 15u || ts[8] != 'T') {
+    if (!ts || strlen(ts) != 15u || ts[8] != 'T')
+    {
         return 0;
     }
 
@@ -215,17 +224,46 @@ static int parse_utc_timestamp(const char *ts,
         !parse_decimal_n(&ts[6], 2u, day) ||
         !parse_decimal_n(&ts[9], 2u, hour) ||
         !parse_decimal_n(&ts[11], 2u, minute) ||
-        !parse_decimal_n(&ts[13], 2u, second)) {
+        !parse_decimal_n(&ts[13], 2u, second))
+    {
         return 0;
     }
 
     if (*month < 1 || *month > 12 || *day < 1 || *day > 31 ||
-        *hour > 23 || *minute > 59 || *second > 59) {
+        *hour > 23 || *minute > 59 || *second > 59)
+    {
         return 0;
     }
 
     return 1;
 }
+
+#if CONFIG_OPEL_DISPLAY_LEVEL_SHIFTER_OE_ENABLED
+static esp_err_t enable_level_shifter_oe(void)
+{
+    const gpio_config_t oe_config = {
+        .pin_bit_mask = 1ULL << PIN_OE,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+
+    esp_err_t ret = gpio_config(&oe_config);
+    if (ret != ESP_OK)
+    {
+        return ret;
+    }
+
+    ret = gpio_set_level((gpio_num_t)PIN_OE, 1);
+    if (ret == ESP_OK)
+    {
+        ESP_LOGI(TAG, "Level shifter OE asserted on GPIO %d", PIN_OE);
+    }
+
+    return ret;
+}
+#endif
 
 /**
  * @brief Format a test string to fit the display width.
@@ -248,16 +286,18 @@ static void demo_charset(opel_mid_handle_t display, opel_mid_type_t type)
     char text[16];
 
     printf("\n=== CHARACTER SET DEMONSTRATION ===\n");
-    printf("Displaying all printable ASCII characters (0x20–0x7E, %lu chars).\n", CHAR_MAP_LEN - (0x7E - 0x20 + 1));
+    printf("Displaying all printable ASCII characters (0x20–0x7E, %u chars).\n", CHAR_MAP_LEN - (0x7E - 0x20 + 1));
     printf("Display width: %d characters.\n\n", width);
 
     /* Show characters in groups of width size */
-    for (int i = 0x20; i <= 0x7E; i += width) {
+    for (int i = 0x20; i <= 0x7E; i += width)
+    {
         int group_size = (0x7E - i + 1 < width) ? (0x7E - i + 1) : width;
 
         /* Build the display string */
         memset(text, ' ', width);
-        for (int j = 0; j < group_size; j++) {
+        for (int j = 0; j < group_size; j++)
+        {
             text[j] = (char)(i + j);
         }
         text[width] = '\0';
@@ -266,7 +306,8 @@ static void demo_charset(opel_mid_handle_t display, opel_mid_type_t type)
 
         /* Send to display */
         esp_err_t ret = opel_mid_send(display, text, NULL);
-        if (ret != ESP_OK) {
+        if (ret != ESP_OK)
+        {
             printf("ERROR: opel_mid_send() failed: 0x%X\n", ret);
             return;
         }
@@ -295,13 +336,15 @@ static void demo_extended_chars(opel_mid_handle_t display, opel_mid_type_t type)
 
     /* Test control characters (0x00–0x1F) */
     printf("Control characters (0x00–0x1F):\n");
-    for (int i = 0x00; i <= 0x1F; i += 2) {
+    for (int i = 0x00; i <= 0x1F; i += 2)
+    {
         char c1 = (char)i;
         char c2 = (char)(i + 1);
 
         memset(text, ' ', width);
         text[0] = c1;
-        if (width > 1) text[1] = c2;
+        if (width > 1)
+            text[1] = c2;
         text[width] = '\0';
 
         printf("0x%02X / 0x%02X: Sending...\n", i, i + 1);
@@ -312,9 +355,12 @@ static void demo_extended_chars(opel_mid_handle_t display, opel_mid_type_t type)
         text[width] = '\0';
 
         esp_err_t ret = opel_mid_send(display, text, NULL);
-        if (ret != ESP_OK) {
+        if (ret != ESP_OK)
+        {
             printf("  ERROR: 0x%02X failed (0x%X)\n", i, ret);
-        } else {
+        }
+        else
+        {
             printf("  0x%02X sent successfully. Note what appears on display.\n", i);
         }
 
@@ -323,7 +369,8 @@ static void demo_extended_chars(opel_mid_handle_t display, opel_mid_type_t type)
 
     /* Test DEL (0x7F) */
     printf("\nDEL (0x7F):\n");
-    for (int i = 0x7F; i <= 0x7F; i++) {
+    for (int i = 0x7F; i <= 0x7F; i++)
+    {
         char c1 = (char)i;
 
         printf("0x%02X: Sending...\n", i);
@@ -333,9 +380,12 @@ static void demo_extended_chars(opel_mid_handle_t display, opel_mid_type_t type)
         text[width] = '\0';
 
         esp_err_t ret = opel_mid_send(display, text, NULL);
-        if (ret != ESP_OK) {
+        if (ret != ESP_OK)
+        {
             printf("  ERROR: 0x%02X failed (0x%X)\n", i, ret);
-        } else {
+        }
+        else
+        {
             printf("  0x%02X sent successfully. Note what appears on display.\n", i);
         }
 
@@ -357,7 +407,8 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
     printf("Toggling all available symbols.\n");
     printf("Radio symbols: COMMA, RDS, TP, STEREO, AS, TP_BRACKET\n");
     printf("Tape symbols: CD_IN, DOLBY_C, DOLBY_B, CR, CPS\n");
-    if (type == OPEL_MID_TYPE_TID_10) {
+    if (type == OPEL_MID_TYPE_TID_10)
+    {
         printf("CD symbols: TRACK, RDM, PGM, DISC\n");
     }
     printf("\n");
@@ -368,7 +419,8 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
     printf("Radio Status Symbols:\n");
     opel_mid_symbols_t symbols = {0, 0, 0};
 
-    if (DISPLAY_TYPE == OPEL_MID_TYPE_TID_8 || DISPLAY_TYPE == OPEL_MID_TYPE_TID_10) {
+    if (DISPLAY_TYPE == OPEL_MID_TYPE_TID_8 || DISPLAY_TYPE == OPEL_MID_TYPE_TID_10)
+    {
         uint8_t radio_flags[] = {
             OPEL_MID_SYM_COMMA,
             OPEL_MID_SYM_RDS,
@@ -379,7 +431,8 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
         };
         const char *radio_names[] = {"COMMA", "RDS", "TP", "STEREO", "AS", "TP_BRACKET"};
 
-        for (size_t i = 0; i < sizeof(radio_flags) / sizeof(radio_flags[0]); i++) {
+        for (size_t i = 0; i < sizeof(radio_flags) / sizeof(radio_flags[0]); i++)
+        {
             symbols.radio = radio_flags[i];
             symbols.tape = 0;
             symbols.cd = 0;
@@ -388,9 +441,12 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
             fflush(stdout);
 
             esp_err_t ret = opel_mid_send(display, text, &symbols);
-            if (ret != ESP_OK) {
+            if (ret != ESP_OK)
+            {
                 printf("ERROR (0x%X)\n", ret);
-            } else {
+            }
+            else
+            {
                 printf("ON\n");
             }
 
@@ -400,7 +456,8 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
 
     /* Tape symbols */
     printf("Tape Status Symbols:\n");
-    if (DISPLAY_TYPE == OPEL_MID_TYPE_TID_8 || DISPLAY_TYPE == OPEL_MID_TYPE_TID_10) {
+    if (DISPLAY_TYPE == OPEL_MID_TYPE_TID_8 || DISPLAY_TYPE == OPEL_MID_TYPE_TID_10)
+    {
         uint8_t tape_flags[] = {
             OPEL_MID_SYM_CD_IN,
             OPEL_MID_SYM_DOLBY_C,
@@ -410,7 +467,8 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
         };
         const char *tape_names[] = {"CD_IN", "DOLBY_C", "DOLBY_B", "CR", "CPS"};
 
-        for (size_t i = 0; i < sizeof(tape_flags) / sizeof(tape_flags[0]); i++) {
+        for (size_t i = 0; i < sizeof(tape_flags) / sizeof(tape_flags[0]); i++)
+        {
             symbols.radio = 0;
             symbols.tape = tape_flags[i];
             symbols.cd = 0;
@@ -419,9 +477,12 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
             fflush(stdout);
 
             esp_err_t ret = opel_mid_send(display, text, &symbols);
-            if (ret != ESP_OK) {
+            if (ret != ESP_OK)
+            {
                 printf("ERROR (0x%X)\n", ret);
-            } else {
+            }
+            else
+            {
                 printf("ON\n");
             }
 
@@ -430,7 +491,8 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
     }
 
     /* CD symbols (10-digit only) */
-    if (type == OPEL_MID_TYPE_TID_10) {
+    if (type == OPEL_MID_TYPE_TID_10)
+    {
         printf("CD Status Symbols (10-digit TID/MID only):\n");
         uint8_t cd_flags[] = {
             OPEL_MID_SYM_TRACK,
@@ -440,7 +502,8 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
         };
         const char *cd_names[] = {"TRACK", "RDM", "PGM", "DISC"};
 
-        for (size_t i = 0; i < sizeof(cd_flags) / sizeof(cd_flags[0]); i++) {
+        for (size_t i = 0; i < sizeof(cd_flags) / sizeof(cd_flags[0]); i++)
+        {
             symbols.radio = 0;
             symbols.tape = 0;
             symbols.cd = cd_flags[i];
@@ -449,9 +512,12 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
             fflush(stdout);
 
             esp_err_t ret = opel_mid_send(display, text, &symbols);
-            if (ret != ESP_OK) {
+            if (ret != ESP_OK)
+            {
                 printf("ERROR (0x%X)\n", ret);
-            } else {
+            }
+            else
+            {
                 printf("ON\n");
             }
 
@@ -467,9 +533,12 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
     symbols.cd = 0xFF & 0xFE;
 
     esp_err_t ret = opel_mid_send(display, text, &symbols);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         printf("ERROR (0x%X)\n", ret);
-    } else {
+    }
+    else
+    {
         printf("ON\n");
     }
 
@@ -483,9 +552,12 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
     symbols.cd = 0;
 
     ret = opel_mid_send(display, text, &symbols);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         printf("ERROR (0x%X)\n", ret);
-    } else {
+    }
+    else
+    {
         printf("OFF\n");
     }
 
@@ -534,7 +606,8 @@ static void demo_edge_cases(opel_mid_handle_t display, opel_mid_type_t type)
     text[2] = '\x7F';
     text[3] = 'S';
     text[4] = '\xFF';
-    for (int i = 5; i < width; i++) text[i] = ' ';
+    for (int i = 5; i < width; i++)
+        text[i] = ' ';
     text[width] = '\0';
     ret = opel_mid_send(display, text, NULL);
     printf("%s\n", ret == ESP_OK ? "OK" : "ERROR");
@@ -562,14 +635,16 @@ static void demo_time_sync(opel_mid_handle_t display)
     printf("Timestamp: ");
     fflush(stdout);
 
-    if (fgets(input, sizeof(input), stdin) == NULL) {
+    if (fgets(input, sizeof(input), stdin) == NULL)
+    {
         printf("Input error.\n");
         return;
     }
 
     input[strcspn(input, "\r\n")] = '\0';
 
-    if (!parse_utc_timestamp(input, &year, &month, &day, &hour, &minute, &second)) {
+    if (!parse_utc_timestamp(input, &year, &month, &day, &hour, &minute, &second))
+    {
         printf("Invalid format. Expected exactly YYYYMMDDTHHmmss with valid ranges.\n");
         return;
     }
@@ -582,7 +657,8 @@ static void demo_time_sync(opel_mid_handle_t display)
                                       (uint8_t)hour,
                                       (uint8_t)minute);
 
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         printf("Time sync failed: 0x%X\n", ret);
         return;
     }
@@ -613,16 +689,19 @@ static void main_menu(opel_mid_handle_t display, opel_mid_type_t type)
            (type == OPEL_MID_TYPE_TID_8) ? "TID-8" : "TID-10/MID",
            get_display_width(type));
 
-    while (1) {
+    while (1)
+    {
         printf("Select (1–7): ");
         fflush(stdout);
 
         char input[16];
-        if (fgets(input, sizeof(input), stdin) == NULL) {
+        if (fgets(input, sizeof(input), stdin) == NULL)
+        {
             continue;
         }
 
-        switch (input[0]) {
+        switch (input[0])
+        {
         case '1':
             demo_charset(display, type);
             break;
@@ -660,24 +739,37 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "Starting OpelXID Demonstration");
 
+    esp_err_t ret;
+
+#if CONFIG_OPEL_DISPLAY_LEVEL_SHIFTER_OE_ENABLED
+    ret = enable_level_shifter_oe();
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to enable level shifter OE: 0x%X", ret);
+        return;
+    }
+#endif
+
     /* Initialize the display */
     opel_mid_config_t config = {
         .pin_sda = (gpio_num_t)PIN_SDA,
         .pin_scl = (gpio_num_t)PIN_SCL,
         .pin_mrq = (gpio_num_t)PIN_MRQ,
-        .type    = DISPLAY_TYPE,
+        .type = DISPLAY_TYPE,
     };
 
     opel_mid_handle_t display = NULL;
-    esp_err_t ret = opel_mid_init(&config, &display);
-    if (ret != ESP_OK) {
+    ret = opel_mid_init(&config, &display);
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "opel_mid_init() failed: 0x%X", ret);
         return;
     }
 
     /* Send power-on test sequence */
     ret = opel_mid_power_on(display);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "opel_mid_power_on() failed: 0x%X", ret);
         opel_mid_deinit(display);
         return;

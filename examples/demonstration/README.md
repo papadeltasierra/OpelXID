@@ -37,6 +37,7 @@ idf.py menuconfig
 # Navigate: OpelXID Demonstration Configuration
 # - Select display type (TID-8 or TID-10/MID)
 # - Set GPIO pins to match your wiring (defaults: 21=SDA, 22=SCL, 23=MRQ)
+# - Optionally enable and assign a GPIO for level shifter OE control
 
 # Build the project
 idf.py build
@@ -53,6 +54,7 @@ idf.py monitor
 
 - **Display Type**: TID-10/MID (10-digit display)
 - **GPIO Pins**: SDA=21, SCL=22, MRQ=23
+- **Level Shifter OE**: Disabled by default; optionally drive it from GPIO 18
 
 Modify via `idf.py menuconfig` if your hardware differs.
 
