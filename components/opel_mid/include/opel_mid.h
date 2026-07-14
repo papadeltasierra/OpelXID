@@ -10,16 +10,6 @@ extern "C" {
 
 /* ── Display type ─────────────────────────────────────────────────────────── */
 
-/*
- * Clock sub-address offsets (relative to the text slave address).
- * These have been observed on the bus but are less rigorously documented
- * than the text protocol.  Verify against your hardware.
- *
- * Reference: https://wiki.carluccio.de/index.php/Opel_TID (§Uhrzeit)
- *   TID-8   clock address: 0x4C
- *   TID-10  clock address: 0x4E
- */
-
 /**
  * @brief Opel display variant.
  *
@@ -159,26 +149,38 @@ esp_err_t opel_mid_send(opel_mid_handle_t          handle,
                         const opel_mid_symbols_t  *symbols);
 
 /**
- * @brief Set the time shown on the display clock segment.
+ * @brief Synchronize the display RTC using the hardware time-sync frame.
  *
- * Sends a 2-byte clock frame to the display's clock sub-address
- * (0x4C for TID-8, 0x4E for TID-10/MID).  The display renders the
- * time independently of the text frame — both can coexist.
- *
- * @note The clock sub-address has been observed on the bus but is not
- *       as thoroughly documented as the text protocol.  Verify the
- *       displayed time against your hardware after first use.
+ * Sends the 13-byte time-sync payload using command byte 0x60:
+ *   byte 0  = 0x10 (TID-8) or 0x12 (TID-10/MID)
+ *   byte 1  = 0x60
+ *   byte 2  = 0x00
+ *   byte 3  = 0x00
+ *   byte 4  = 0x00
+ *   byte 5  = day (1..31)
+ *   byte 6  = month (1..12)
+ *   byte 7  = year (0..99, last two digits)
+ *   byte 8  = hours (0..23)
+ *   byte 9  = minutes (0..59)
+ *   byte 10 = 0x00
+ *   byte 11 = 0x00
+ *   byte 12 = inverted XOR checksum of bytes 0..11
  *
  * @param handle  Handle obtained from opel_mid_init().
+ * @param day     Day of month (1–31).
+ * @param month   Month (1–12).
+ * @param year    Last two digits of year (0–99).
  * @param hours   Hour value (0–23).
  * @param minutes Minute value (0–59).
  *
  * @return ESP_OK              on success.
- * @return ESP_ERR_INVALID_ARG if @p handle is NULL, or @p hours / @p minutes
- *                             are out of range.
+ * @return ESP_ERR_INVALID_ARG if @p handle is NULL or any field is out of range.
  * @return ESP_ERR_TIMEOUT     if the slave does not respond.
  */
 esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
+                            uint8_t           day,
+                            uint8_t           month,
+                            uint8_t           year,
                             uint8_t           hours,
                             uint8_t           minutes);
 

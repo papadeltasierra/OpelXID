@@ -13,8 +13,6 @@ static const char *TAG = "opel_mid";
 
 #define OPEL_MID_ADDR_TID_8       0x4Au
 #define OPEL_MID_ADDR_TID_10      0x4Du
-#define OPEL_MID_ADDR_CLOCK_TID_8  0x4Cu  /* Clock sub-address for 8-digit TID  */
-#define OPEL_MID_ADDR_CLOCK_TID_10 0x4Eu  /* Clock sub-address for 10-digit TID/MID */
 
 #define OPEL_MID_DATA_BYTES_8   8u
 #define OPEL_MID_DATA_BYTES_10  10u
@@ -598,41 +596,46 @@ esp_err_t opel_mid_send(opel_mid_handle_t         handle,
 }
 
 esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
+                            uint8_t           day,
+                            uint8_t           month,
+                            uint8_t           year,
                             uint8_t           hours,
                             uint8_t           minutes)
 {
     if (!handle) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (hours > 23u || minutes > 59u) {
-        ESP_LOGE(TAG, "opel_mid_set_time: invalid time %02u:%02u", hours, minutes);
+    if (day < 1u || day > 31u || month < 1u || month > 12u || year > 99u ||
+        hours > 23u || minutes > 59u) {
+        ESP_LOGE(TAG, "opel_mid_set_time: invalid datetime %02u-%02u-%02u %02u:%02u",
+                 day, month, year, hours, minutes);
         return ESP_ERR_INVALID_ARG;
     }
 
     struct opel_mid_dev_t   *dev = handle;
     const opel_mid_config_t *cfg = &dev->config;
 
-    /*
-     * Clock frame (§Uhrzeit):
-     *   – Address: 0x4C (TID-8) or 0x4E (TID-10/MID)
-     *   – Byte 1:  hours   in bits[7:1], odd parity in bit[0]
-     *   – Byte 2:  minutes in bits[7:1], odd parity in bit[0]
-     *
-     * The hour and minute values are plain binary (0–23, 0–59), placed in
-     * bits[7:1] using the same encoding as all other bus bytes.
-     *
-     * NOTE: The clock sub-address has been observed on the bus but is not
-     * as rigorously documented as the text protocol. If the display does not
-     * respond or shows garbled time, verify the address against your hardware
-     * with an oscilloscope.
-     */
-    uint8_t clock_addr = (dev->addr == OPEL_MID_ADDR_TID_8)
-                         ? OPEL_MID_ADDR_CLOCK_TID_8
-                         : OPEL_MID_ADDR_CLOCK_TID_10;
+    /* Hardware time-sync frame (13 bytes) using command 0x60. */
+    uint8_t frame[13] = {0};
+    frame[0]  = (dev->addr == OPEL_MID_ADDR_TID_8) ? 0x10u : 0x12u;
+    frame[1]  = 0x60u;
+    frame[2]  = 0x00u;
+    frame[3]  = 0x00u;
+    frame[4]  = 0x00u;
+    frame[5]  = day;
+    frame[6]  = month;
+    frame[7]  = year;
+    frame[8]  = hours;
+    frame[9]  = minutes;
+    frame[10] = 0x00u;
+    frame[11] = 0x00u;
 
-    uint8_t addr_byte    = apply_odd_parity((uint8_t)(clock_addr << 1u));
-    uint8_t hours_byte   = apply_odd_parity((uint8_t)(hours   << 1u));
-    uint8_t minutes_byte = apply_odd_parity((uint8_t)(minutes << 1u));
+    /* Inverted XOR checksum over bytes 0..11. */
+    uint8_t checksum = 0u;
+    for (size_t i = 0u; i < 12u; i++) {
+        checksum ^= frame[i];
+    }
+    frame[12] = (uint8_t)~checksum;
 
     esp_err_t ret = bus_start(cfg);
     if (ret != ESP_OK) {
@@ -640,28 +643,14 @@ esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
         return ret;
     }
 
-    ret = bus_send_byte_with_retry(cfg, addr_byte);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "opel_mid_set_time: address byte failed (0x%02X)", addr_byte);
-        bus_stop(cfg);
-        bus_reset_to_idle(cfg);
-        return ret;
-    }
-
-    ret = bus_send_byte_with_retry(cfg, hours_byte);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "opel_mid_set_time: hours byte failed (%u)", hours);
-        bus_stop(cfg);
-        bus_reset_to_idle(cfg);
-        return ret;
-    }
-
-    ret = bus_send_byte_with_retry(cfg, minutes_byte);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "opel_mid_set_time: minutes byte failed (%u)", minutes);
-        bus_stop(cfg);
-        bus_reset_to_idle(cfg);
-        return ret;
+    for (size_t i = 0u; i < sizeof(frame); i++) {
+        ret = bus_send_byte_with_retry(cfg, frame[i]);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "opel_mid_set_time: frame byte %u failed (0x%02X)", (unsigned)i, frame[i]);
+            bus_stop(cfg);
+            bus_reset_to_idle(cfg);
+            return ret;
+        }
     }
 
     ret = bus_stop(cfg);
@@ -671,6 +660,7 @@ esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
         return ret;
     }
 
-    ESP_LOGI(TAG, "Set time: %02u:%02u (clock addr 0x%02X)", hours, minutes, clock_addr);
+    ESP_LOGI(TAG, "Set time sync: %02u-%02u-%02u %02u:%02u (cmd=0x60, checksum=0x%02X)",
+             day, month, year, hours, minutes, frame[12]);
     return ESP_OK;
 }
