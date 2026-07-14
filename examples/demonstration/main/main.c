@@ -180,6 +180,54 @@ static int get_display_width(opel_mid_type_t type)
 }
 
 /**
+ * @brief Parse one decimal digit sequence into an integer.
+ */
+static int parse_decimal_n(const char *s, size_t n, int *out)
+{
+    int v = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (!isdigit((unsigned char)s[i])) {
+            return 0;
+        }
+        v = (v * 10) + (s[i] - '0');
+    }
+    *out = v;
+    return 1;
+}
+
+/**
+ * @brief Parse UTC timestamp in YYYYMMDDTHHmmss format.
+ */
+static int parse_utc_timestamp(const char *ts,
+                               int *year,
+                               int *month,
+                               int *day,
+                               int *hour,
+                               int *minute,
+                               int *second)
+{
+    if (!ts || strlen(ts) != 15u || ts[8] != 'T') {
+        return 0;
+    }
+
+    if (!parse_decimal_n(&ts[0], 4u, year) ||
+        !parse_decimal_n(&ts[4], 2u, month) ||
+        !parse_decimal_n(&ts[6], 2u, day) ||
+        !parse_decimal_n(&ts[9], 2u, hour) ||
+        !parse_decimal_n(&ts[11], 2u, minute) ||
+        !parse_decimal_n(&ts[13], 2u, second)) {
+        return 0;
+    }
+
+    if (*month < 1 || *month > 12 || *day < 1 || *day > 31 ||
+        *hour > 23 || *minute > 59 || *second > 59) {
+        return 0;
+    }
+
+    return 1;
+}
+
+/**
  * @brief Format a test string to fit the display width.
  */
 static void format_text(char *out, size_t max_len, const char *text, int width)
@@ -496,6 +544,55 @@ static void demo_edge_cases(opel_mid_handle_t display, opel_mid_type_t type)
 }
 
 /**
+ * @brief Demo: Hardware time sync from UTC timestamp input.
+ */
+static void demo_time_sync(opel_mid_handle_t display)
+{
+    char input[64];
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    int hour = 0;
+    int minute = 0;
+    int second = 0;
+
+    printf("\n=== HARDWARE TIME SYNC (0x60) ===\n");
+    printf("Enter UTC timestamp as YYYYMMDDTHHmmss (example: 20260714T154500).\n");
+    printf("Century and seconds are ignored by the display protocol.\n\n");
+    printf("Timestamp: ");
+    fflush(stdout);
+
+    if (fgets(input, sizeof(input), stdin) == NULL) {
+        printf("Input error.\n");
+        return;
+    }
+
+    input[strcspn(input, "\r\n")] = '\0';
+
+    if (!parse_utc_timestamp(input, &year, &month, &day, &hour, &minute, &second)) {
+        printf("Invalid format. Expected exactly YYYYMMDDTHHmmss with valid ranges.\n");
+        return;
+    }
+
+    uint8_t year_2digit = (uint8_t)(year % 100);
+    esp_err_t ret = opel_mid_set_time(display,
+                                      (uint8_t)day,
+                                      (uint8_t)month,
+                                      year_2digit,
+                                      (uint8_t)hour,
+                                      (uint8_t)minute);
+
+    if (ret != ESP_OK) {
+        printf("Time sync failed: 0x%X\n", ret);
+        return;
+    }
+
+    printf("Time sync sent: input=%s -> day=%02d month=%02d year=%02u hour=%02d minute=%02d (seconds ignored: %02d)\n",
+           input, day, month, year_2digit, hour, minute, second);
+    wait_for_return();
+}
+
+/**
  * @brief Main menu.
  */
 static void main_menu(opel_mid_handle_t display, opel_mid_type_t type)
@@ -509,14 +606,15 @@ static void main_menu(opel_mid_handle_t display, opel_mid_type_t type)
     printf("║ 3. All Symbols (Radio/Tape/CD)        ║\n");
     printf("║ 4. Edge Cases                          ║\n");
     printf("║ 5. Run All Demonstrations             ║\n");
-    printf("║ 6. Exit                                ║\n");
+    printf("║ 6. Time Sync (UTC timestamp)          ║\n");
+    printf("║ 7. Exit                                ║\n");
     printf("╚════════════════════════════════════════╝\n");
     printf("Display type: %s (%d characters)\n\n",
            (type == OPEL_MID_TYPE_TID_8) ? "TID-8" : "TID-10/MID",
            get_display_width(type));
 
     while (1) {
-        printf("Select (1–6): ");
+        printf("Select (1–7): ");
         fflush(stdout);
 
         char input[16];
@@ -545,6 +643,9 @@ static void main_menu(opel_mid_handle_t display, opel_mid_type_t type)
             printf("\n=== ALL DEMONSTRATIONS COMPLETE ===\n");
             break;
         case '6':
+            demo_time_sync(display);
+            break;
+        case '7':
             printf("Exiting.\n");
             return;
         default:
