@@ -65,11 +65,11 @@ After flashing, the demonstration displays a menu:
 ║   OpelXID MID/TID Demonstration Menu   ║
 ╠════════════════════════════════════════╣
 ║ 1. Character Set (all printable ASCII) ║
-║ 2. Non-printable codes (0x00–0x1F,7F) ║
-║ 3. All Symbols (Radio/Tape/CD)        ║
+║ 2. Non-printable codes (0x00–0x1F,7F)  ║
+║ 3. All Symbols (Radio/Tape/CD)         ║
 ║ 4. Edge Cases                          ║
-║ 5. Run All Demonstrations             ║
-║ 6. Time Sync (UTC timestamp)          ║
+║ 5. Run All Demonstrations              ║
+║ 6. Time Sync (UTC timestamp)           ║
 ║ 7. Exit                                ║
 ╚════════════════════════════════════════╝
 
