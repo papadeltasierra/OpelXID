@@ -33,12 +33,12 @@ static const char *TAG = "demonstration";
 /**
  * @brief Character code mapping.
  *
- * Maps display values (0x00–0xFF) to display behavior. Initially configured
- * for standard ASCII (0x20–0x7E). Can be extended with custom mappings for
- * verified extended characters or test values.
+ * Maps 7-bit display payload values (0x00–0x7F) to display behavior.
+ * Initially configured for standard ASCII (0x20–0x7E). Can be extended
+ * with custom mappings for verified control/del behavior.
  *
  * This structure allows:
- *   1. Testing extended character codes (0x00–0x1F, 0x7F–0xFF)
+ *   1. Testing non-printable 7-bit codes (0x00–0x1F, 0x7F)
  *   2. Documenting verified mappings as they're discovered
  *   3. Per-application customization (e.g., if a specific vehicle supports
  *      additional segment-based characters)
@@ -147,7 +147,7 @@ static const char_map_entry_t char_map[] = {
     {0x7D, "}", "brace-right"},
     {0x7E, "~", "tilde"},
 
-    /* Extended characters (0x00–0x1F, 0x7F–0xFF) — to be discovered */
+    /* Non-printable 7-bit values (0x00–0x1F, 0x7F) — to be discovered */
     /* Placeholder entries for testing. Replace with findings from actual hardware. */
     {0x00, "?", "NUL (unknown)"},
     {0x01, "?", "SOH (unknown)"},
@@ -230,19 +230,19 @@ static void demo_charset(opel_mid_handle_t display, opel_mid_type_t type)
 }
 
 /**
- * @brief Demo: Extended character testing (Option 2).
+ * @brief Demo: Non-printable 7-bit code testing (Option 2).
  *
- * Allows testing of non-standard ASCII codes to discover what the display
- * shows. Useful for documenting extended character sets.
+ * Allows testing of non-printable 7-bit payload values to discover what
+ * the display shows. Useful for documenting control-code behavior.
  */
 static void demo_extended_chars(opel_mid_handle_t display, opel_mid_type_t type)
 {
     int width = get_display_width(type);
     char text[16];
 
-    printf("\n=== EXTENDED CHARACTER TESTING ===\n");
-    printf("Testing character codes 0x00–0x1F (control chars) and 0x7F–0xFF (extended).\n");
-    printf("These may map to special display segments or extended glyphs.\n");
+    printf("\n=== 7-BIT NON-PRINTABLE CODE TESTING ===\n");
+    printf("Testing payload codes 0x00–0x1F (control chars) and 0x7F (DEL).\n");
+    printf("Transport is 7-bit data + odd parity; 0x80–0xFF are not distinct payload codes.\n");
     printf("Observe what appears on the hardware and document findings.\n\n");
 
     /* Test control characters (0x00–0x1F) */
@@ -273,13 +273,12 @@ static void demo_extended_chars(opel_mid_handle_t display, opel_mid_type_t type)
         wait_for_return();
     }
 
-    /* Test extended characters (0x7F–0xFF) */
-    printf("\nExtended characters (0x7F–0xFF):\n");
-    for (int i = 0x7F; i <= 0xFF; i += 2) {
+    /* Test DEL (0x7F) */
+    printf("\nDEL (0x7F):\n");
+    for (int i = 0x7F; i <= 0x7F; i++) {
         char c1 = (char)i;
-        char c2 = (char)(i + 1);
 
-        printf("0x%02X / 0x%02X: Sending...\n", i, i + 1);
+        printf("0x%02X: Sending...\n", i);
 
         memset(text, ' ', width);
         text[0] = c1;
@@ -292,12 +291,10 @@ static void demo_extended_chars(opel_mid_handle_t display, opel_mid_type_t type)
             printf("  0x%02X sent successfully. Note what appears on display.\n", i);
         }
 
-        if (i + 1 <= 0xFF) {
-            wait_for_return();
-        }
+        wait_for_return();
     }
 
-    printf("\nExtended character testing complete.\n");
+    printf("\nNon-printable 7-bit code testing complete.\n");
 }
 
 /**
@@ -482,7 +479,7 @@ static void demo_edge_cases(opel_mid_handle_t display, opel_mid_type_t type)
     wait_for_return();
 
     /* Non-printable characters (become spaces) */
-    printf("Non-printable characters (0x01, 0x7F, 0xFF become spaces): ");
+    printf("Non-printable characters (0x01, 0x7F, 0xFF treated as non-printable and become spaces): ");
     fflush(stdout);
     text[0] = '\x01';
     text[1] = 'T';
@@ -508,7 +505,7 @@ static void main_menu(opel_mid_handle_t display, opel_mid_type_t type)
     printf("║   OpelXID MID/TID Demonstration Menu   ║\n");
     printf("╠════════════════════════════════════════╣\n");
     printf("║ 1. Character Set (all printable ASCII) ║\n");
-    printf("║ 2. Extended Characters (0x00–0xFF)    ║\n");
+    printf("║ 2. Non-printable codes (0x00–0x1F,7F) ║\n");
     printf("║ 3. All Symbols (Radio/Tape/CD)        ║\n");
     printf("║ 4. Edge Cases                          ║\n");
     printf("║ 5. Run All Demonstrations             ║\n");

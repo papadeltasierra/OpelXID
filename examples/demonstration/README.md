@@ -1,6 +1,6 @@
 # OpelXID Demonstration Example
 
-This example provides an interactive demonstration of all OpelXID library features, designed for exploring the display capabilities and discovering extended character mappings.
+This example provides an interactive demonstration of all OpelXID library features, designed for exploring the display capabilities and documenting 7-bit code mappings.
 
 ## What It Does
 
@@ -8,7 +8,7 @@ The demonstration offers an interactive menu with four demonstrations:
 
 1. **Character Set** — Displays all printable ASCII characters (0x20–0x7E) in groups matching your display width. Useful for verifying character rendering.
 
-2. **Extended Characters** — Tests characters outside the standard ASCII range (0x00–0x1F, 0x7F–0xFF). As you observe the hardware behavior, the built-in table documents which characters display correctly and what they show.
+2. **Non-printable Codes** — Tests non-printable 7-bit payload values (0x00–0x1F and 0x7F). As you observe the hardware behavior, the built-in table documents which codes display correctly and what they show.
 
 3. **All Symbols** — Toggles each symbol individually to verify all symbol flags work correctly (RDS, TP, STEREO, AS, etc.). Press return between each test.
 
@@ -63,7 +63,7 @@ After flashing, the demonstration displays a menu:
 ║   OpelXID MID/TID Demonstration Menu   ║
 ╠════════════════════════════════════════╣
 ║ 1. Character Set (all printable ASCII) ║
-║ 2. Extended Characters (0x00–0xFF)    ║
+║ 2. Non-printable codes (0x00–0x1F,7F) ║
 ║ 3. All Symbols (Radio/Tape/CD)        ║
 ║ 4. Edge Cases                          ║
 ║ 5. Run All Demonstrations             ║
@@ -75,7 +75,7 @@ Select (1–6): _
 
 Select a demonstration by number and press return. Each test prompts you to press return before proceeding to the next action, giving you time to observe the display output.
 
-## Discovering Extended Characters
+## Discovering Non-Printable Codes
 
 As you test characters with option 2, the code includes a table structure ready to document findings:
 
@@ -87,7 +87,7 @@ struct {
 } char_map[];
 ```
 
-When you discover which codes produce interesting characters (arrows, musical notes, special symbols, etc.), you can add entries to this table to build a comprehensive mapping for your specific hardware.
+When you discover which control/DEL codes produce useful or unusual output, you can add entries to this table to build a mapping for your specific hardware.
 
 ## Example Usage
 
