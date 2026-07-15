@@ -196,14 +196,12 @@ static int read_line_blocking(char *buffer, size_t buffer_len)
     {
         return 0;
     }
-
     while (1)
     {
         if (fgets(buffer, buffer_len, stdin) != NULL)
         {
             return 1;
         }
-
         clearerr(stdin);
         vTaskDelay(pdMS_TO_TICKS(INPUT_RETRY_DELAY_MS));
     }
@@ -692,10 +690,7 @@ static void demo_time_sync(opel_mid_handle_t display)
     wait_for_return();
 }
 
-/**
- * @brief Main menu.
- */
-static void main_menu(opel_mid_handle_t display, opel_mid_type_t type)
+static void show_menu()
 {
     printf("\n");
     printf("╔════════════════════════════════════════╗\n");
@@ -712,9 +707,16 @@ static void main_menu(opel_mid_handle_t display, opel_mid_type_t type)
     printf("Display type: %s (%d characters)\n\n",
            (type == OPEL_MID_TYPE_TID_8) ? "TID-8" : "TID-10/MID",
            get_display_width(type));
+}
 
+/**
+ * @brief Main menu.
+ */
+static void main_menu(opel_mid_handle_t display, opel_mid_type_t type)
+{
     while (1)
     {
+        show_menu(type);
         printf("Select (1–7): ");
         fflush(stdout);
 
@@ -792,7 +794,9 @@ void app_main(void)
     }
 
     /* Send power-on test sequence */
+    ESP_LOGI(TAG, "Calling opel_mid_power_on()...");
     ret = opel_mid_power_on(display);
+    ESP_LOGI(TAG, "opel_mid_power_on() returned: 0x%X", ret);
     if (ret != ESP_OK)
     {
         ESP_LOGE(TAG, "opel_mid_power_on() failed: 0x%X", ret);
