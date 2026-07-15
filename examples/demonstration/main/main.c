@@ -12,7 +12,10 @@
 
 static const char *TAG = "demonstration";
 
-#define INPUT_RETRY_DELAY_MS 20
+#define DEMO_STEP_DELAY_MS 1200
+
+static opel_mid_handle_t s_display = NULL;
+static opel_mid_type_t s_display_type;
 
 /* ── Configuration ────────────────────────────────────────────────────────── */
 
@@ -166,17 +169,11 @@ static const char_map_entry_t char_map[] = {
 /* ── Helper functions ─────────────────────────────────────────────────────── */
 
 /**
- * @brief Wait for user to press <return>.
+ * @brief Give time to observe output between demo steps.
  */
-static void wait_for_return(void)
+static void wait_between_steps(void)
 {
-    printf("Press <return> to continue...\n");
-    fflush(stdout);
-    int c;
-    do
-    {
-        c = fgetc(stdin);
-    } while (c != '\n' && c != '\r' && c != EOF);
+    vTaskDelay(pdMS_TO_TICKS(DEMO_STEP_DELAY_MS));
 }
 
 /**
@@ -185,26 +182,6 @@ static void wait_for_return(void)
 static int get_display_width(opel_mid_type_t type)
 {
     return (type == OPEL_MID_TYPE_TID_8) ? 8 : 10;
-}
-
-/**
- * @brief Read one line from stdin, retrying on transient input errors.
- */
-static int read_line_blocking(char *buffer, size_t buffer_len)
-{
-    if (buffer == NULL || buffer_len == 0u)
-    {
-        return 0;
-    }
-    while (1)
-    {
-        if (fgets(buffer, buffer_len, stdin) != NULL)
-        {
-            return 1;
-        }
-        clearerr(stdin);
-        vTaskDelay(pdMS_TO_TICKS(INPUT_RETRY_DELAY_MS));
-    }
 }
 
 /**
@@ -334,7 +311,7 @@ static void demo_charset(opel_mid_handle_t display, opel_mid_type_t type)
             return;
         }
 
-        wait_for_return();
+        wait_between_steps();
     }
 
     printf("\nCharacter set demonstration complete.\n");
@@ -386,7 +363,7 @@ static void demo_extended_chars(opel_mid_handle_t display, opel_mid_type_t type)
             printf("  0x%02X sent successfully. Note what appears on display.\n", i);
         }
 
-        wait_for_return();
+        wait_between_steps();
     }
 
     /* Test DEL (0x7F) */
@@ -411,7 +388,7 @@ static void demo_extended_chars(opel_mid_handle_t display, opel_mid_type_t type)
             printf("  0x%02X sent successfully. Note what appears on display.\n", i);
         }
 
-        wait_for_return();
+        wait_between_steps();
     }
 
     printf("\nNon-printable 7-bit code testing complete.\n");
@@ -472,7 +449,7 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
                 printf("ON\n");
             }
 
-            wait_for_return();
+            wait_between_steps();
         }
     }
 
@@ -508,7 +485,7 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
                 printf("ON\n");
             }
 
-            wait_for_return();
+            wait_between_steps();
         }
     }
 
@@ -543,7 +520,7 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
                 printf("ON\n");
             }
 
-            wait_for_return();
+            wait_between_steps();
         }
     }
 
@@ -564,7 +541,7 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
         printf("ON\n");
     }
 
-    wait_for_return();
+    wait_between_steps();
 
     /* All symbols off */
     printf("All symbols OFF: ");
@@ -603,7 +580,7 @@ static void demo_edge_cases(opel_mid_handle_t display, opel_mid_type_t type)
     text[width] = '\0';
     esp_err_t ret = opel_mid_send(display, "", NULL);
     printf("%s\n", ret == ESP_OK ? "OK" : "ERROR");
-    wait_for_return();
+    wait_between_steps();
 
     /* Long text (truncation) */
     printf("Text longer than display width (should truncate): ");
@@ -611,14 +588,14 @@ static void demo_edge_cases(opel_mid_handle_t display, opel_mid_type_t type)
     const char *long_text = "THIS_TEXT_IS_WAY_TOO_LONG";
     ret = opel_mid_send(display, long_text, NULL);
     printf("%s (displayed: %.*s)\n", ret == ESP_OK ? "OK" : "ERROR", width, long_text);
-    wait_for_return();
+    wait_between_steps();
 
     /* Short text (padding) */
     printf("Short text (should be space-padded): ");
     fflush(stdout);
     ret = opel_mid_send(display, "HI", NULL);
     printf("%s\n", ret == ESP_OK ? "OK" : "ERROR");
-    wait_for_return();
+    wait_between_steps();
 
     /* Non-printable characters (become spaces) */
     printf("Non-printable characters (0x01, 0x7F, 0xFF treated as non-printable and become spaces): ");
@@ -633,7 +610,7 @@ static void demo_edge_cases(opel_mid_handle_t display, opel_mid_type_t type)
     text[width] = '\0';
     ret = opel_mid_send(display, text, NULL);
     printf("%s\n", ret == ESP_OK ? "OK" : "ERROR");
-    wait_for_return();
+    wait_between_steps();
 
     printf("Edge case testing complete.\n");
 }
@@ -641,9 +618,8 @@ static void demo_edge_cases(opel_mid_handle_t display, opel_mid_type_t type)
 /**
  * @brief Demo: Hardware time sync from UTC timestamp input.
  */
-static void demo_time_sync(opel_mid_handle_t display)
+static void demo_time_sync(opel_mid_handle_t display, const char *input)
 {
-    char input[64];
     int year = 0;
     int month = 0;
     int day = 0;
@@ -652,18 +628,8 @@ static void demo_time_sync(opel_mid_handle_t display)
     int second = 0;
 
     printf("\n=== HARDWARE TIME SYNC (0x60) ===\n");
-    printf("Enter UTC timestamp as YYYYMMDDTHHmmss (example: 20260714T154500).\n");
+    printf("Using UTC timestamp YYYYMMDDTHHmmss (example: 20260714T154500).\n");
     printf("Century and seconds are ignored by the display protocol.\n\n");
-    printf("Timestamp: ");
-    fflush(stdout);
-
-    if (!read_line_blocking(input, sizeof(input)))
-    {
-        printf("Input error.\n");
-        return;
-    }
-
-    input[strcspn(input, "\r\n")] = '\0';
 
     if (!parse_utc_timestamp(input, &year, &month, &day, &hour, &minute, &second))
     {
@@ -687,77 +653,166 @@ static void demo_time_sync(opel_mid_handle_t display)
 
     printf("Time sync sent: input=%s -> day=%02d month=%02d year=%02u hour=%02d minute=%02d (seconds ignored: %02d)\n",
            input, day, month, year_2digit, hour, minute, second);
-    wait_for_return();
+    wait_between_steps();
 }
 
-static void show_menu()
+static int cmd_demo_charset(int argc, char **argv)
 {
-    printf("\n");
-    printf("╔════════════════════════════════════════╗\n");
-    printf("║   OpelXID MID/TID Demonstration Menu   ║\n");
-    printf("╠════════════════════════════════════════╣\n");
-    printf("║ 1. Character Set (all printable ASCII) ║\n");
-    printf("║ 2. Non-printable codes (0x00–0x1F,7F)  ║\n");
-    printf("║ 3. All Symbols (Radio/Tape/CD)         ║\n");
-    printf("║ 4. Edge Cases                          ║\n");
-    printf("║ 5. Run All Demonstrations              ║\n");
-    printf("║ 6. Time Sync (UTC timestamp)           ║\n");
-    printf("║ 7. Exit                                ║\n");
-    printf("╚════════════════════════════════════════╝\n");
-    printf("Display type: %s (%d characters)\n\n",
-           (type == OPEL_MID_TYPE_TID_8) ? "TID-8" : "TID-10/MID",
-           get_display_width(type));
+    (void)argc;
+    (void)argv;
+    demo_charset(s_display, s_display_type);
+    return 0;
 }
 
-/**
- * @brief Main menu.
- */
-static void main_menu(opel_mid_handle_t display, opel_mid_type_t type)
+static int cmd_demo_extended(int argc, char **argv)
 {
-    while (1)
+    (void)argc;
+    (void)argv;
+    demo_extended_chars(s_display, s_display_type);
+    return 0;
+}
+
+static int cmd_demo_symbols(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    demo_symbols(s_display, s_display_type);
+    return 0;
+}
+
+static int cmd_demo_edge(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    demo_edge_cases(s_display, s_display_type);
+    return 0;
+}
+
+static int cmd_demo_all(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    demo_charset(s_display, s_display_type);
+    demo_extended_chars(s_display, s_display_type);
+    demo_symbols(s_display, s_display_type);
+    demo_edge_cases(s_display, s_display_type);
+    printf("\n=== ALL DEMONSTRATIONS COMPLETE ===\n");
+    return 0;
+}
+
+static int cmd_time_sync(int argc, char **argv)
+{
+    if (argc != 2)
     {
-        show_menu(type);
-        printf("Select (1–7): ");
-        fflush(stdout);
-
-        char input[16];
-        if (!read_line_blocking(input, sizeof(input)))
-        {
-            printf("Input error.\n");
-            continue;
-        }
-
-        switch (input[0])
-        {
-        case '1':
-            demo_charset(display, type);
-            break;
-        case '2':
-            demo_extended_chars(display, type);
-            break;
-        case '3':
-            demo_symbols(display, type);
-            break;
-        case '4':
-            demo_edge_cases(display, type);
-            break;
-        case '5':
-            demo_charset(display, type);
-            demo_extended_chars(display, type);
-            demo_symbols(display, type);
-            demo_edge_cases(display, type);
-            printf("\n=== ALL DEMONSTRATIONS COMPLETE ===\n");
-            break;
-        case '6':
-            demo_time_sync(display);
-            break;
-        case '7':
-            printf("Exiting.\n");
-            return;
-        default:
-            printf("Invalid selection. Try again.\n");
-        }
+        printf("Usage: time-sync YYYYMMDDTHHmmss\n");
+        return 1;
     }
+
+    demo_time_sync(s_display, argv[1]);
+    return 0;
+}
+
+static int cmd_demo_info(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    printf("Display type: %s (%d characters)\n",
+           (s_display_type == OPEL_MID_TYPE_TID_8) ? "TID-8" : "TID-10/MID",
+           get_display_width(s_display_type));
+    printf("Commands:\n");
+    printf("  demo-charset   - show printable ASCII\n");
+    printf("  demo-extended  - test non-printable 7-bit codes\n");
+    printf("  demo-symbols   - toggle symbol groups\n");
+    printf("  demo-edge      - run edge case tests\n");
+    printf("  demo-all       - run all demos\n");
+    printf("  time-sync <ts> - send UTC timestamp (YYYYMMDDTHHmmss)\n");
+    printf("  help           - list registered commands\n");
+    return 0;
+}
+
+static void register_console_commands(void)
+{
+    const esp_console_cmd_t info_cmd = {
+        .command = "demo-info",
+        .help = "Show display information and available demo commands",
+        .hint = NULL,
+        .func = &cmd_demo_info,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&info_cmd));
+
+    const esp_console_cmd_t charset_cmd = {
+        .command = "demo-charset",
+        .help = "Display all printable ASCII characters",
+        .hint = NULL,
+        .func = &cmd_demo_charset,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&charset_cmd));
+
+    const esp_console_cmd_t extended_cmd = {
+        .command = "demo-extended",
+        .help = "Test non-printable 7-bit payload codes",
+        .hint = NULL,
+        .func = &cmd_demo_extended,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&extended_cmd));
+
+    const esp_console_cmd_t symbols_cmd = {
+        .command = "demo-symbols",
+        .help = "Toggle all supported radio/tape/cd symbols",
+        .hint = NULL,
+        .func = &cmd_demo_symbols,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&symbols_cmd));
+
+    const esp_console_cmd_t edge_cmd = {
+        .command = "demo-edge",
+        .help = "Run string handling edge case tests",
+        .hint = NULL,
+        .func = &cmd_demo_edge,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&edge_cmd));
+
+    const esp_console_cmd_t all_cmd = {
+        .command = "demo-all",
+        .help = "Run all demonstration sequences",
+        .hint = NULL,
+        .func = &cmd_demo_all,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&all_cmd));
+
+    const esp_console_cmd_t time_sync_cmd = {
+        .command = "time-sync",
+        .help = "Sync display time from UTC timestamp",
+        .hint = "<YYYYMMDDTHHmmss>",
+        .func = &cmd_time_sync,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&time_sync_cmd));
+}
+
+static void start_console_repl(void)
+{
+    esp_console_repl_config_t repl_config = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
+    repl_config.prompt = "opelxid> ";
+
+    esp_console_register_help_command();
+    register_console_commands();
+
+    esp_console_repl_t *repl = NULL;
+
+#if CONFIG_ESP_CONSOLE_UART_DEFAULT || CONFIG_ESP_CONSOLE_UART_CUSTOM
+    esp_console_dev_uart_config_t hw_config = ESP_CONSOLE_DEV_UART_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_console_new_repl_uart(&hw_config, &repl_config, &repl));
+#elif CONFIG_ESP_CONSOLE_USB_CDC
+    esp_console_dev_usb_cdc_config_t hw_config = ESP_CONSOLE_DEV_CDC_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_console_new_repl_usb_cdc(&hw_config, &repl_config, &repl));
+#elif CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+    esp_console_dev_usb_serial_jtag_config_t hw_config = ESP_CONSOLE_DEV_USB_SERIAL_JTAG_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_console_new_repl_usb_serial_jtag(&hw_config, &repl_config, &repl));
+#else
+#error "No supported ESP console transport enabled"
+#endif
+
+    ESP_ERROR_CHECK(esp_console_start_repl(repl));
 }
 
 /* ── Main ─────────────────────────────────────────────────────────────────── */
@@ -804,15 +859,13 @@ void app_main(void)
         return;
     }
 
-    printf("\nOpelXID MID/TID Demonstration\n");
-    printf("==============================\n");
-    printf("\nDisplay initialized and power-on test sent.\n");
-    printf("The display should now be ready.\n\n");
+    s_display = display;
+    s_display_type = DISPLAY_TYPE;
 
-    /* Run the menu */
-    main_menu(display, DISPLAY_TYPE);
+    printf("\nOpelXID MID/TID Demonstration Console\n");
+    printf("======================================\n");
+    printf("Display initialized and power-on test sent.\n");
+    printf("Type 'help' to list commands, then run 'demo-info' for examples.\n\n");
 
-    /* Cleanup */
-    opel_mid_deinit(display);
-    ESP_LOGI(TAG, "Demonstration complete");
+    start_console_repl();
 }
