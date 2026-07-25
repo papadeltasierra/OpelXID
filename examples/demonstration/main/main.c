@@ -712,6 +712,40 @@ static int cmd_time_sync(int argc, char **argv)
     return 0;
 }
 
+static int cmd_power_on(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+
+    if (!s_display)
+    {
+        printf("Display is not initialized.\n");
+        return 1;
+    }
+
+    printf("Running display power-on test sequence...\n");
+    esp_err_t ret = opel_mid_power_on(s_display);
+    if (ret != ESP_OK)
+    {
+        printf("power-on failed: 0x%X\n", ret);
+        return 1;
+    }
+
+    char text[16];
+    int width = get_display_width(s_display_type);
+    format_text(text, sizeof(text), "READY!", width);
+
+    ret = opel_mid_send(s_display, text, NULL);
+    if (ret != ESP_OK)
+    {
+        printf("power-on completed, but sending READY! failed: 0x%X\n", ret);
+        return 1;
+    }
+
+    printf("power-on completed successfully. Sent: '%s'\n", text);
+    return 0;
+}
+
 static int cmd_demo_info(int argc, char **argv)
 {
     (void)argc;
@@ -725,6 +759,7 @@ static int cmd_demo_info(int argc, char **argv)
     printf("  demo-symbols   - toggle symbol groups\n");
     printf("  demo-edge      - run edge case tests\n");
     printf("  demo-all       - run all demos\n");
+    printf("  power-on       - run display power-on test sequence\n");
     printf("  time-sync <ts> - send UTC timestamp (YYYYMMDDTHHmmss)\n");
     printf("  help           - list registered commands\n");
     return 0;
@@ -779,6 +814,14 @@ static void register_console_commands(void)
         .func = &cmd_demo_all,
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&all_cmd));
+
+    const esp_console_cmd_t power_on_cmd = {
+        .command = "power-on",
+        .help = "Run display power-on test sequence",
+        .hint = NULL,
+        .func = &cmd_power_on,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&power_on_cmd));
 
     const esp_console_cmd_t time_sync_cmd = {
         .command = "time-sync",
@@ -848,23 +891,13 @@ void app_main(void)
         return;
     }
 
-    /* Send power-on test sequence */
-    ESP_LOGI(TAG, "Calling opel_mid_power_on()...");
-    ret = opel_mid_power_on(display);
-    ESP_LOGI(TAG, "opel_mid_power_on() returned: 0x%X", ret);
-    if (ret != ESP_OK)
-    {
-        ESP_LOGE(TAG, "opel_mid_power_on() failed: 0x%X", ret);
-        opel_mid_deinit(display);
-        return;
-    }
-
     s_display = display;
     s_display_type = DISPLAY_TYPE;
 
     printf("\nOpelXID MID/TID Demonstration Console\n");
     printf("======================================\n");
-    printf("Display initialized and power-on test sent.\n");
+    printf("Display initialized.\n");
+    printf("Run 'power-on' when you want to execute the display power-on sequence.\n");
     printf("Type 'help' to list commands, then run 'demo-info' for examples.\n\n");
 
     start_console_repl();
