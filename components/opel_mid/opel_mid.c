@@ -36,6 +36,12 @@ static const char *TAG = "opel_mid";
 #define T_MRQ_US 100u           /* Generic MRQ pulse width */
 #define T_SDA_WAIT_US 100u      /* Poll interval waiting for slave SDA response */
 #define T_SDA_TIMEOUT_US 15000u /* T1max: slave must respond within 15 ms */
+#define T_POWER_ON_T1_MS 100u   /* Power-on test T1 minimum */
+#define T_POWER_ON_T2_US 500u   /* Power-on test T2 minimum */
+#define T_POWER_ON_T3_US 1000u  /* Power-on test T3 minimum */
+
+/* Debug override: disable power-on line-state checks while keeping timing/pulses. */
+#define OPEL_MID_DEBUG_SKIP_POWER_ON_LEVEL_CHECKS 0u
 
 /* ── Device structure ─────────────────────────────────────────────────────── */
 
@@ -57,6 +63,39 @@ static inline void mrq_high(const opel_mid_config_t *c) { gpio_set_level(c->pin_
 static inline void mrq_low(const opel_mid_config_t *c) { gpio_set_level(c->pin_mrq, 0); }
 static inline int get_sda(const opel_mid_config_t *c) { return gpio_get_level(c->pin_sda); }
 static inline int get_scl(const opel_mid_config_t *c) { return gpio_get_level(c->pin_scl); }
+static inline int get_mrq(const opel_mid_config_t *c) { return gpio_get_level(c->pin_mrq); }
+
+static esp_err_t expect_bus_levels(const opel_mid_config_t *cfg,
+                                   int expected_sda,
+                                   int expected_scl,
+                                   int expected_mrq,
+                                   const char *phase)
+{
+#if OPEL_MID_DEBUG_SKIP_POWER_ON_LEVEL_CHECKS
+    (void)cfg;
+    (void)expected_sda;
+    (void)expected_scl;
+    (void)expected_mrq;
+    (void)phase;
+    return ESP_OK;
+#else
+    int sda = get_sda(cfg);
+    int scl = get_scl(cfg);
+    int mrq = get_mrq(cfg);
+
+    if (sda != expected_sda || scl != expected_scl || mrq != expected_mrq)
+    {
+        ESP_LOGE(TAG,
+                 "%s: expected SDA/SCL/MRQ=%d/%d/%d, got %d/%d/%d",
+                 phase,
+                 expected_sda, expected_scl, expected_mrq,
+                 sda, scl, mrq);
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    return ESP_OK;
+#endif
+}
 
 /* ── Parity ───────────────────────────────────────────────────────────────── */
 
@@ -151,11 +190,11 @@ static esp_err_t wait_sda(const opel_mid_config_t *cfg, int expected)
  */
 static esp_err_t bus_start(const opel_mid_config_t *cfg)
 {
-    /* 1. Master sets MRQ low */
+    /* [1] 1. Master sets MRQ low */
     mrq_low(cfg);
     ets_delay_us(T_MRQ_US);
 
-    /* 2. Slave pulls SDA low (wait up to T1max = 15 ms).
+    /* [2] 2. Slave pulls SDA low (wait up to T1max = 15 ms).
      *    Failure here means the display is not responding or bus is shorted. */
     esp_err_t ret = wait_sda(cfg, 0);
     if (ret != ESP_OK)
@@ -166,11 +205,11 @@ static esp_err_t bus_start(const opel_mid_config_t *cfg)
     }
     ets_delay_us(T_MRQ_US);
 
-    /* 3. Master sets MRQ high */
+    /* [3] 3. Master sets MRQ high */
     mrq_high(cfg);
     ets_delay_us(T_MRQ_US);
 
-    /* 4. Slave releases SDA high (wait up to T_SDA_TIMEOUT_US = 15 ms).
+    /* [4] 4. Slave releases SDA high (wait up to T_SDA_TIMEOUT_US = 15 ms).
      *    Failure here means SDA is stuck low (short to ground). */
     ret = wait_sda(cfg, 1);
     if (ret != ESP_OK)
@@ -185,7 +224,7 @@ static esp_err_t bus_start(const opel_mid_config_t *cfg)
     sda_low(cfg);
     ets_delay_us(T_MRQ_US);
 
-    /* 6. Master pulls SCL low */
+    /* [6] 6. Master pulls SCL low */
     scl_low(cfg);
     ets_delay_us(T_MRQ_US);
 
@@ -266,6 +305,8 @@ static esp_err_t bus_send_byte(const opel_mid_config_t *cfg, uint8_t byte)
     /* 7. Release SDA (open-drain pull-up) */
     sda_high(cfg);
     ets_delay_us(T_SETUP_US);
+
+    // At this point the slave will pull SDA low for an ACK or leave high for a NACK.
 
     /* 8. Set SCL high */
     scl_high(cfg);
@@ -411,7 +452,7 @@ esp_err_t opel_mid_init(const opel_mid_config_t *config,
         .pin_bit_mask = (1ULL << config->pin_sda) |
                         (1ULL << config->pin_scl) |
                         (1ULL << config->pin_mrq),
-        .mode = GPIO_MODE_OUTPUT_OD,
+        .mode = GPIO_MODE_INPUT_OUTPUT_OD,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
@@ -455,6 +496,7 @@ esp_err_t opel_mid_power_on(opel_mid_handle_t handle)
 
     struct opel_mid_dev_t *dev = handle;
     const opel_mid_config_t *cfg = &dev->config;
+    esp_err_t ret;
 
     /*
      * Power-on test sequence (§Power on Test).
@@ -472,43 +514,128 @@ esp_err_t opel_mid_power_on(opel_mid_handle_t handle)
      *   – Signal appears on wrong line → cross-short between lines
      *
      * The sequence:
-     *   1. SCL high (release)
-     *   2. Wait T1 (≥ 100 ms)
-     *   3. SCL low (pull)
-     *   4. Wait T1 (≥ 100 ms)
-     *   5. SCL high (release)
-     *   6. MRQ low (pull)
-     *   7. Wait T2 (500 µs – 1 ms)
-     *   8. MRQ high (release)
-     *   9. Wait T3 (1 ms – 2 ms) before first bus_start()
+     *   - SDA high (release)
+     *   - SCL high (release)
+     *   - MRQ high (release)
+     *   - Wait T1 (≥ 100 ms)
+     *   - SDA, SCL, MRQ all expected high
+     *   - SDA low (pull)
+     *   - SCL low (pull)
+     *   - MRQ low (pull)
+     *   - Wait T2 (≥ 500 µs)
+     *   - SDA, SCL, MRQ all expected low
+     *   - SDA high (release)
+     *   - SCL high (release)
+     *   - MRQ high (release)
+     *   - SDA, SCL, MRQ all expected high
+     *   - Wait T2 (≥ 500 µs)
+     *   - SDA low (pull)
+     *   - Wait T2 (≥ 500 µs)
+     *   - SDQ expected low, SCL/MRQ expected high
+     *   - SDA release (high)
+     *   - Wait T2 (≥ 500 µs)
+     *   - SDA, SCL, MRQ all expected high
+     *   - SCL low (pull)
+     *   - Wait T2 (≥ 500 µs)
+     *   - SCL expected low, SDA/MRQ expected high
+     *   - SCL release (high)
+     *   - Wait T2 (≥ 500 µs)
+     *   - SDA, SCL, MRQ all expected high
+     *   - MRQ low (pull)
+     *   - Wait T2 (≥ 500 µs)
+     *   - MRQ expected low, SDA/SCL expected high
+     *   - MRQ release (high)
+     *   - Wait T3 (≥ 1 ms)
+     *   - SDA high (release)
+     *   - SCL high (release)
+     *   - MRQ high (release)
      */
 
-    /* Ensure bus is idle-high before test */
-    scl_high(cfg);
     sda_high(cfg);
-    mrq_high(cfg);
-
-    ESP_LOGI(TAG, "Power-on test: SCL pulse (T1=100ms)...");
-
-    /* T1: SCL low pulse (100 ms) */
-    scl_low(cfg);
-    vTaskDelay(pdMS_TO_TICKS(100));
-
-    /* Release SCL */
     scl_high(cfg);
-    vTaskDelay(pdMS_TO_TICKS(100));
-
-    ESP_LOGI(TAG, "Power-on test: MRQ pulse (T2=500µs)...");
-
-    /* T2: MRQ low pulse (500 µs – 1 ms, use 1 ms for safety) */
-    mrq_low(cfg);
-    ets_delay_us(1000);
-
-    /* Release MRQ */
     mrq_high(cfg);
 
-    /* T3: Gap before first data (1 ms – 2 ms) */
-    ets_delay_us(2000);
+    vTaskDelay(pdMS_TO_TICKS(T_POWER_ON_T1_MS));
+    ret = expect_bus_levels(cfg, 1, 1, 1, "power-on step 1 idle-high check");
+    if (ret != ESP_OK)
+    {
+        bus_reset_to_idle(cfg);
+        return ret;
+    }
+
+    sda_low(cfg);
+    scl_low(cfg);
+    mrq_low(cfg);
+    ets_delay_us(T_POWER_ON_T2_US);
+    ret = expect_bus_levels(cfg, 0, 0, 0, "power-on step 2 all-low check");
+    if (ret != ESP_OK)
+    {
+        bus_reset_to_idle(cfg);
+        return ret;
+    }
+
+    sda_high(cfg);
+    scl_high(cfg);
+    mrq_high(cfg);
+    ret = expect_bus_levels(cfg, 1, 1, 1, "power-on step 3 all-high check");
+    if (ret != ESP_OK)
+    {
+        bus_reset_to_idle(cfg);
+        return ret;
+    }
+    ets_delay_us(T_POWER_ON_T2_US);
+
+    sda_low(cfg);
+    ets_delay_us(T_POWER_ON_T2_US);
+    ret = expect_bus_levels(cfg, 0, 1, 1, "power-on step 4 SDA-low check");
+    if (ret != ESP_OK)
+    {
+        bus_reset_to_idle(cfg);
+        return ret;
+    }
+
+    sda_high(cfg);
+    ets_delay_us(T_POWER_ON_T2_US);
+    ret = expect_bus_levels(cfg, 1, 1, 1, "power-on step 5 SDA-release check");
+    if (ret != ESP_OK)
+    {
+        bus_reset_to_idle(cfg);
+        return ret;
+    }
+
+    scl_low(cfg);
+    ets_delay_us(T_POWER_ON_T2_US);
+    ret = expect_bus_levels(cfg, 1, 0, 1, "power-on step 6 SCL-low check");
+    if (ret != ESP_OK)
+    {
+        bus_reset_to_idle(cfg);
+        return ret;
+    }
+
+    scl_high(cfg);
+    ets_delay_us(T_POWER_ON_T2_US);
+    ret = expect_bus_levels(cfg, 1, 1, 1, "power-on step 7 SCL-release check");
+    if (ret != ESP_OK)
+    {
+        bus_reset_to_idle(cfg);
+        return ret;
+    }
+
+    mrq_low(cfg);
+    ets_delay_us(T_POWER_ON_T2_US);
+    ret = expect_bus_levels(cfg, 1, 1, 0, "power-on step 8 MRQ-low check");
+    if (ret != ESP_OK)
+    {
+        bus_reset_to_idle(cfg);
+        return ret;
+    }
+
+    mrq_high(cfg);
+    ets_delay_us(T_POWER_ON_T3_US);
+
+    sda_high(cfg);
+    scl_high(cfg);
+    mrq_high(cfg);
 
     ESP_LOGI(TAG, "Power-on test complete");
     return ESP_OK;
@@ -569,7 +696,9 @@ esp_err_t opel_mid_send(opel_mid_handle_t handle,
      * Address byte: the 7-bit slave address is placed in bits[7:1] and odd
      * parity applied to bit[0], consistent with all other bus bytes.
      */
-    uint8_t addr_byte = apply_odd_parity((uint8_t)(dev->addr << 1u));
+    // uint8_t addr_byte = apply_odd_parity((uint8_t)(dev->addr << 1u));
+    // !!PDS: Hacking try on address.  Address does not appear to have parity.
+    uint8_t addr_byte = dev->addr;
 
     /* ── Transmit frame (§Format einer Nachricht) ─────────────────────────── */
     esp_err_t ret;
