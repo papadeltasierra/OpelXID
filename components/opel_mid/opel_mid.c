@@ -758,64 +758,46 @@ esp_err_t opel_mid_send(opel_mid_handle_t handle,
     return ret;
 }
 
-esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
-                            uint8_t day,
-                            uint8_t month,
-                            uint8_t year,
-                            uint8_t hours,
-                            uint8_t minutes)
+esp_err_t opel_mid10_send(opel_mid_handle_t handle,
+                          const uint8_t *data)
 {
-    if (!handle)
+    if (!handle || !data)
     {
-        return ESP_ERR_INVALID_ARG;
-    }
-    if (day < 1u || day > 31u || month < 1u || month > 12u || year > 99u ||
-        hours > 23u || minutes > 59u)
-    {
-        ESP_LOGE(TAG, "opel_mid_set_time: invalid datetime %02u-%02u-%02u %02u:%02u",
-                 day, month, year, hours, minutes);
         return ESP_ERR_INVALID_ARG;
     }
 
     struct opel_mid_dev_t *dev = handle;
     const opel_mid_config_t *cfg = &dev->config;
+    uint8_t addr_byte = dev->addr;
 
-    /* Hardware time-sync frame (13 bytes) using command 0x60. */
-    uint8_t frame[13] = {0};
-    frame[0] = (dev->addr == OPEL_MID_ADDR_TID_8) ? 0x10u : 0x12u;
-    frame[1] = 0x60u;
-    frame[2] = 0x00u;
-    frame[3] = 0x00u;
-    frame[4] = 0x00u;
-    frame[5] = day;
-    frame[6] = month;
-    frame[7] = year;
-    frame[8] = hours;
-    frame[9] = minutes;
-    frame[10] = 0x00u;
-    frame[11] = 0x00u;
+    /* ── Transmit frame (§Format einer Nachricht) ─────────────────────────── */
+    esp_err_t ret;
 
-    /* Inverted XOR checksum over bytes 0..11. */
-    uint8_t checksum = 0u;
-    for (size_t i = 0u; i < 12u; i++)
-    {
-        checksum ^= frame[i];
-    }
-    frame[12] = (uint8_t)~checksum;
-
-    esp_err_t ret = bus_start(cfg);
+    ret = bus_start(cfg);
     if (ret != ESP_OK)
     {
-        ESP_LOGE(TAG, "opel_mid_set_time: bus_start() failed");
+        /* bus_start() calls bus_reset_to_idle() on error, so no cleanup needed */
+        ESP_LOGE(TAG, "opel_mid_send: bus_start() failed; frame transmission aborted");
         return ret;
     }
 
-    for (size_t i = 0u; i < sizeof(frame); i++)
+    /* 1. Slave address */
+    ret = bus_send_byte_with_retry(cfg, addr_byte);
+    if (ret != ESP_OK)
     {
-        ret = bus_send_byte_with_retry(cfg, frame[i]);
+        ESP_LOGE(TAG, "opel_mid_send: address byte transmission failed (0x%02X)", addr_byte);
+        bus_stop(cfg);
+        bus_reset_to_idle(cfg); /* Extra recovery after stop */
+        return ret;
+    }
+
+    for (uint8_t i = 0u; i < 11; i++)
+    {
+        // char c = (i < text_len) ? text[i] : ' ';
+        ret = bus_send_byte_with_retry(cfg, apply_odd_parity(data[i]));
         if (ret != ESP_OK)
         {
-            ESP_LOGE(TAG, "opel_mid_set_time: frame byte %u failed (0x%02X)", (unsigned)i, frame[i]);
+            ESP_LOGE(TAG, "opel_mid_send: data byte %u transmission failed (data=0x%02X)", i, data[i]);
             bus_stop(cfg);
             bus_reset_to_idle(cfg);
             return ret;
@@ -825,12 +807,77 @@ esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
     ret = bus_stop(cfg);
     if (ret != ESP_OK)
     {
+        ESP_LOGE(TAG, "opel_mid_send: bus_stop() failed");
+        bus_reset_to_idle(cfg);
+    }
+    return ret;
+}
+
+esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
+                            uint32_t mjd,
+                            uint8_t utc_hour,
+                            uint8_t utc_minute,
+                            int8_t local_offset_half_hours)
+{
+    if (!handle)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (mjd > 0x1FFFFu || utc_hour > 23u || utc_minute > 59u ||
+        local_offset_half_hours < -31 || local_offset_half_hours > 31)
+    {
+        ESP_LOGE(TAG, "opel_mid_set_time: invalid args mjd=%lu utc=%02u:%02u offset_half_hours=%d",
+                 (unsigned long)mjd, utc_hour, utc_minute, local_offset_half_hours);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    struct opel_mid_dev_t *dev = handle;
+    const opel_mid_config_t *cfg = &dev->config;
+    uint8_t rawPacket[8];
+
+    /* RDS-style CT payload with MJD, UTC time, and local offset. */
+    rawPacket[0] = apply_odd_parity(0x47);
+
+    uint8_t offset_abs = (uint8_t)((local_offset_half_hours < 0) ? -local_offset_half_hours : local_offset_half_hours);
+    uint8_t offsetField = (local_offset_half_hours < 0) ? (uint8_t)(offset_abs | 0x20u) : offset_abs;
+    rawPacket[1] = apply_odd_parity(offsetField);
+
+    rawPacket[2] = apply_odd_parity(utc_minute);
+    rawPacket[3] = apply_odd_parity(utc_hour);
+
+    /* 17-bit MJD spread across protocol bytes. */
+    rawPacket[4] = apply_odd_parity((mjd >> 9) & 0x7F); // Upper bits
+    rawPacket[5] = apply_odd_parity((mjd >> 2) & 0x7F); // Middle block
+    rawPacket[6] = apply_odd_parity(((mjd & 0x03) << 5) | 0x03);
+    rawPacket[7] = apply_odd_parity((mjd >> 14) & 0x07);
+
+    esp_err_t ret = bus_start(cfg);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "opel_mid_set_time: bus_start() failed");
+        return ret;
+    }
+
+    for (size_t i = 0u; i < sizeof(rawPacket); i++)
+    {
+        ret = bus_send_byte_with_retry(cfg, rawPacket[i]);
+        if (ret != ESP_OK)
+        {
+            ESP_LOGE(TAG, "opel_mid_set_time: frame byte %u failed (0x%02X)", (unsigned)i, rawPacket[i]);
+            bus_stop(cfg);
+            bus_reset_to_idle(cfg);
+            return ret;
+        }
+    }
+    ret = bus_stop(cfg);
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "opel_mid_set_time: bus_stop() failed");
         bus_reset_to_idle(cfg);
         return ret;
     }
 
-    ESP_LOGI(TAG, "Set time sync: %02u-%02u-%02u %02u:%02u (cmd=0x60, checksum=0x%02X)",
-             day, month, year, hours, minutes, frame[12]);
+    ESP_LOGI(TAG, "Set time sync: mjd=%lu utc=%02u:%02u offset_half_hours=%d",
+             (unsigned long)mjd, utc_hour, utc_minute, local_offset_half_hours);
     return ESP_OK;
 }

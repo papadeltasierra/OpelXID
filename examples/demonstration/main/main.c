@@ -9,6 +9,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdint.h>
+#include <time.h>
+#include <sys/time.h>
 
 static const char *TAG = "demonstration";
 
@@ -16,6 +19,9 @@ static const char *TAG = "demonstration";
 
 static opel_mid_handle_t s_display = NULL;
 static opel_mid_type_t s_display_type;
+static int32_t s_utc_offset_seconds = 0;
+static int s_utc_offset_is_set = 0;
+static int s_time_initialized = 0;
 
 /* ── Configuration ────────────────────────────────────────────────────────── */
 
@@ -203,38 +209,118 @@ static int parse_decimal_n(const char *s, size_t n, int *out)
 }
 
 /**
- * @brief Parse UTC timestamp in YYYYMMDDTHHmmss format.
+ * @brief Check if year is leap year in Gregorian calendar.
  */
-static int parse_utc_timestamp(const char *ts,
-                               int *year,
-                               int *month,
-                               int *day,
-                               int *hour,
-                               int *minute,
-                               int *second)
+static int is_leap_year(int year)
 {
-    if (!ts || strlen(ts) != 15u || ts[8] != 'T')
+    return ((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0);
+}
+
+/**
+ * @brief Return number of days in month.
+ */
+static int days_in_month(int year, int month)
+{
+    static const int days[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    if (month == 2)
+    {
+        return is_leap_year(year) ? 29 : 28;
+    }
+    return days[month - 1];
+}
+
+/**
+ * @brief Parse RFC3339 timestamp (YYYY-MM-DDTHH:MM:SSZ or +/-HH:MM).
+ */
+static int parse_rfc3339_timestamp(const char *ts,
+                                   int *year,
+                                   int *month,
+                                   int *day,
+                                   int *hour,
+                                   int *minute,
+                                   int *second,
+                                   int *offset_seconds)
+{
+    if (!ts)
+    {
+        return 0;
+    }
+
+    size_t len = strlen(ts);
+    if (!((len == 20u && ts[19] == 'Z') || (len == 25u && (ts[19] == '+' || ts[19] == '-'))))
+    {
+        return 0;
+    }
+
+    if (ts[4] != '-' || ts[7] != '-' || ts[10] != 'T' || ts[13] != ':' || ts[16] != ':')
     {
         return 0;
     }
 
     if (!parse_decimal_n(&ts[0], 4u, year) ||
-        !parse_decimal_n(&ts[4], 2u, month) ||
-        !parse_decimal_n(&ts[6], 2u, day) ||
-        !parse_decimal_n(&ts[9], 2u, hour) ||
-        !parse_decimal_n(&ts[11], 2u, minute) ||
-        !parse_decimal_n(&ts[13], 2u, second))
+        !parse_decimal_n(&ts[5], 2u, month) ||
+        !parse_decimal_n(&ts[8], 2u, day) ||
+        !parse_decimal_n(&ts[11], 2u, hour) ||
+        !parse_decimal_n(&ts[14], 2u, minute) ||
+        !parse_decimal_n(&ts[17], 2u, second))
     {
         return 0;
     }
 
-    if (*month < 1 || *month > 12 || *day < 1 || *day > 31 ||
+    if (*year < 1970 || *month < 1 || *month > 12 || *day < 1 ||
         *hour > 23 || *minute > 59 || *second > 59)
     {
         return 0;
     }
 
+    if (*day > days_in_month(*year, *month))
+    {
+        return 0;
+    }
+
+    if (len == 20u)
+    {
+        *offset_seconds = 0;
+        return 1;
+    }
+
+    if (ts[22] != ':')
+    {
+        return 0;
+    }
+
+    int off_hour = 0;
+    int off_minute = 0;
+    if (!parse_decimal_n(&ts[20], 2u, &off_hour) || !parse_decimal_n(&ts[23], 2u, &off_minute))
+    {
+        return 0;
+    }
+
+    if (off_hour > 23 || off_minute > 59)
+    {
+        return 0;
+    }
+
+    int sign = (ts[19] == '-') ? -1 : 1;
+    *offset_seconds = sign * ((off_hour * 3600) + (off_minute * 60));
     return 1;
+}
+
+/**
+ * @brief Convert civil date/time components to Unix epoch seconds.
+ */
+static int64_t epoch_seconds_from_ymdhms(int year, int month, int day, int hour, int minute, int second)
+{
+    int y = year;
+    int m = month;
+    y -= (m <= 2);
+    const int era = (y >= 0 ? y : y - 399) / 400;
+    const unsigned yoe = (unsigned)(y - era * 400);
+    const unsigned doy = (153u * (unsigned)(m + (m > 2 ? -3 : 9)) + 2u) / 5u + (unsigned)day - 1u;
+    const unsigned doe = yoe * 365u + yoe / 4u - yoe / 100u + doy;
+    const int64_t days_since_epoch = (int64_t)era * 146097 + (int64_t)doe - 719468;
+
+    return (days_since_epoch * 86400) + (hour * 3600) + (minute * 60) + second;
 }
 
 #if CONFIG_OPEL_DISPLAY_LEVEL_SHIFTER_OE_ENABLED
@@ -315,6 +401,102 @@ static void demo_charset(opel_mid_handle_t display, opel_mid_type_t type)
     }
 
     printf("\nCharacter set demonstration complete.\n");
+}
+
+/**
+ * @brief Display BBC Radio 4 info; as capturered by logic probe
+ */
+static void bbcr4(opel_mid_handle_t display, opel_mid_type_t type)
+{
+    // int width = get_display_width(type);
+    char text[16];
+    opel_mid_symbols_t symbols = {0, 0, 0};
+
+    symbols.radio = 0x2A; // 0b00101100 = > 0b01011000 with parity(0x58)
+
+    text[0] = 0x0A; // 0b0001010 => 0b00010101 with parity (0x15).
+    text[1] = 0x04; // 0b0000100 => 0b00001000 with parity (0x08).
+    text[2] = 'B';
+    text[3] = 'B';
+    text[4] = 'C';
+    text[5] = ' ';
+    text[6] = 'R';
+    text[7] = '4';
+    text[8] = ' ';
+    text[9] = ' ';
+    printf("\nBBCR4 demonstration complete.\n");
+
+    esp_err_t ret = opel_mid_send(display, text, &symbols);
+    if (ret != ESP_OK)
+    {
+        printf("  ERROR: BBCR4 failed (0x%X)\n", ret);
+    }
+    else
+    {
+        printf("  BBCR4 sent successfully. Note what appears on display.\n");
+    }
+}
+
+/**
+ * @brief mode 10, clock/date override mode
+ */
+static void mode10(opel_mid_handle_t display, opel_mid_type_t type)
+{
+    // int width = get_display_width(type);
+    uint8_t text[16];
+
+    text[0] = 0x10; // 0b0001000 => 0b00100000 with parity (0x20).
+    text[1] = 'M';
+    text[2] = 'O';
+    text[3] = 'D';
+    text[4] = 'E';
+    text[5] = ' ';
+    text[6] = '1';
+    text[7] = '0';
+    text[9] = ' ';
+    text[10] = ' ';
+    printf("\nMode 10 demonstration complete.\n");
+
+    esp_err_t ret = opel_mid10_send(display, text);
+    if (ret != ESP_OK)
+    {
+        printf("  ERROR: Mode10 failed (0x%X)\n", ret);
+    }
+    else
+    {
+        printf("  Mode10 sent successfully. Note what appears on display.\n");
+    }
+}
+
+/**
+ * @brief mode 11, trip counter mode
+ */
+static void mode11(opel_mid_handle_t display, opel_mid_type_t type)
+{
+    // int width = get_display_width(type);
+    uint8_t text[16];
+
+    text[0] = 0x11; // 0b0001001 => 0b00100011 with parity (0x23).
+    text[1] = 'M';
+    text[2] = 'O';
+    text[3] = 'D';
+    text[4] = 'E';
+    text[5] = ' ';
+    text[6] = '1';
+    text[7] = '1';
+    text[9] = ' ';
+    text[10] = ' ';
+    printf("\nMode 11 demonstration complete.\n");
+
+    esp_err_t ret = opel_mid10_send(display, text);
+    if (ret != ESP_OK)
+    {
+        printf("  ERROR: Mode11 failed (0x%X)\n", ret);
+    }
+    else
+    {
+        printf("  Mode11 sent successfully. Note what appears on display.\n");
+    }
 }
 
 /**
@@ -399,7 +581,7 @@ static void demo_extended_chars(opel_mid_handle_t display, opel_mid_type_t type)
  */
 static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
 {
-    int width = get_display_width(type);
+    // int width = get_display_width(type);
     char text[16];
 
     printf("\n=== SYMBOL DEMONSTRATION ===\n");
@@ -412,45 +594,47 @@ static void demo_symbols(opel_mid_handle_t display, opel_mid_type_t type)
     }
     printf("\n");
 
-    format_text(text, sizeof(text), "SYMBOLS", width);
+    // format_text(text, sizeof(text), "SYMBOLS", width);
 
     /* Radio symbols */
     printf("Radio Status Symbols:\n");
     opel_mid_symbols_t symbols = {0, 0, 0};
 
-    if (DISPLAY_TYPE == OPEL_MID_TYPE_TID_8 || DISPLAY_TYPE == OPEL_MID_TYPE_TID_10)
+    for (int i = 0; i < 22; i++)
     {
-        uint8_t radio_flags[] = {
-            OPEL_MID_SYM_COMMA,
-            OPEL_MID_SYM_RDS,
-            OPEL_MID_SYM_TP,
-            OPEL_MID_SYM_STEREO,
-            OPEL_MID_SYM_AS,
-            OPEL_MID_SYM_TP_BRACKET,
-        };
-        const char *radio_names[] = {"COMMA", "RDS", "TP", "STEREO", "AS", "TP_BRACKET"};
-
-        for (size_t i = 0; i < sizeof(radio_flags) / sizeof(radio_flags[0]); i++)
+        symbols.radio = 0;
+        symbols.tape = 0;
+        symbols.cd = 0;
+        if (i == 0)
         {
-            symbols.radio = radio_flags[i];
-            symbols.tape = 0;
-            symbols.cd = 0;
-
-            printf("  %s: ", radio_names[i]);
-            fflush(stdout);
-
-            esp_err_t ret = opel_mid_send(display, text, &symbols);
-            if (ret != ESP_OK)
-            {
-                printf("ERROR (0x%X)\n", ret);
-            }
-            else
-            {
-                printf("ON\n");
-            }
-
-            wait_between_steps();
+            sprintf(text, " NONE  ");
         }
+        else if (i > 14)
+        {
+            sprintf(text, " CD %d    ", (i - 15));
+            symbols.cd = (1 << (i - 15));
+        }
+        else if (i > 7)
+        {
+            sprintf(text, " TAPE %d  ", (i - 8));
+            symbols.tape = (1 << (i - 8));
+        }
+        else
+        {
+            sprintf(text, " RADIO %d  ", (i - 1));
+            symbols.radio = (1 << (i - 1));
+        }
+        esp_err_t ret = opel_mid_send(display, text, &symbols);
+        if (ret != ESP_OK)
+        {
+            printf("ERROR (0x%X)\n", ret);
+        }
+        else
+        {
+            printf("ON\n");
+        }
+
+        wait_between_steps();
     }
 
     /* Tape symbols */
@@ -616,34 +800,43 @@ static void demo_edge_cases(opel_mid_handle_t display, opel_mid_type_t type)
 }
 
 /**
- * @brief Demo: Hardware time sync from UTC timestamp input.
+ * @brief Demo: Hardware time sync from ESP32 UTC clock + stored local offset.
  */
-static void demo_time_sync(opel_mid_handle_t display, const char *input)
+static void demo_time_sync(opel_mid_handle_t display)
 {
-    int year = 0;
-    int month = 0;
-    int day = 0;
-    int hour = 0;
-    int minute = 0;
-    int second = 0;
+    printf("\n=== HARDWARE TIME SYNC (RDS MJD) ===\n");
 
-    printf("\n=== HARDWARE TIME SYNC (0x60) ===\n");
-    printf("Using UTC timestamp YYYYMMDDTHHmmss (example: 20260714T154500).\n");
-    printf("Century and seconds are ignored by the display protocol.\n\n");
-
-    if (!parse_utc_timestamp(input, &year, &month, &day, &hour, &minute, &second))
+    if (!s_time_initialized || !s_utc_offset_is_set)
     {
-        printf("Invalid format. Expected exactly YYYYMMDDTHHmmss with valid ranges.\n");
+        printf("No time set ready to send. Run: set-time <RFC3339> first.\n");
         return;
     }
 
-    uint8_t year_2digit = (uint8_t)(year % 100);
+    if ((s_utc_offset_seconds % 1800) != 0)
+    {
+        printf("Stored UTC offset (%ld s) is not representable in 30-minute RDS steps.\n",
+               (long)s_utc_offset_seconds);
+        return;
+    }
+
+    time_t now_utc = time(NULL);
+    if (now_utc <= 0)
+    {
+        printf("ESP32 UTC clock is not initialized. Run set-time first.\n");
+        return;
+    }
+
+    struct tm utc_tm;
+    gmtime_r(&now_utc, &utc_tm);
+
+    uint32_t mjd = (uint32_t)((int64_t)now_utc / 86400LL + 40587LL);
+    int8_t offset_half_hours = (int8_t)(s_utc_offset_seconds / 1800);
+
     esp_err_t ret = opel_mid_set_time(display,
-                                      (uint8_t)day,
-                                      (uint8_t)month,
-                                      year_2digit,
-                                      (uint8_t)hour,
-                                      (uint8_t)minute);
+                                      mjd,
+                                      (uint8_t)utc_tm.tm_hour,
+                                      (uint8_t)utc_tm.tm_min,
+                                      offset_half_hours);
 
     if (ret != ESP_OK)
     {
@@ -651,8 +844,16 @@ static void demo_time_sync(opel_mid_handle_t display, const char *input)
         return;
     }
 
-    printf("Time sync sent: input=%s -> day=%02d month=%02d year=%02u hour=%02d minute=%02d (seconds ignored: %02d)\n",
-           input, day, month, year_2digit, hour, minute, second);
+    printf("Time sync sent: MJD=%lu UTC=%04d-%02d-%02dT%02d:%02d:%02dZ offset=%+03ld:%02ld\n",
+           (unsigned long)mjd,
+           utc_tm.tm_year + 1900,
+           utc_tm.tm_mon + 1,
+           utc_tm.tm_mday,
+           utc_tm.tm_hour,
+           utc_tm.tm_min,
+           utc_tm.tm_sec,
+           (long)(s_utc_offset_seconds / 3600),
+           (long)((s_utc_offset_seconds < 0 ? -s_utc_offset_seconds : s_utc_offset_seconds) % 3600 / 60));
     wait_between_steps();
 }
 
@@ -661,6 +862,30 @@ static int cmd_demo_charset(int argc, char **argv)
     (void)argc;
     (void)argv;
     demo_charset(s_display, s_display_type);
+    return 0;
+}
+
+static int cmd_bbcr4(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    bbcr4(s_display, s_display_type);
+    return 0;
+}
+
+static int cmd_mode10(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    mode10(s_display, s_display_type);
+    return 0;
+}
+
+static int cmd_mode11(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    mode11(s_display, s_display_type);
     return 0;
 }
 
@@ -702,13 +927,75 @@ static int cmd_demo_all(int argc, char **argv)
 
 static int cmd_time_sync(int argc, char **argv)
 {
-    if (argc != 2)
+    (void)argv;
+
+    if (argc != 1)
     {
-        printf("Usage: time-sync YYYYMMDDTHHmmss\n");
+        printf("Usage: time-sync\n");
+        printf("Note: run set-time <RFC3339> first.\n");
         return 1;
     }
 
-    demo_time_sync(s_display, argv[1]);
+    demo_time_sync(s_display);
+    return 0;
+}
+
+static int cmd_set_time(int argc, char **argv)
+{
+    if (argc != 2)
+    {
+        printf("Usage: set-time <RFC3339>\n");
+        printf("Example: set-time 2026-08-06T13:51:00+01:00\n");
+        return 1;
+    }
+
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    int hour = 0;
+    int minute = 0;
+    int second = 0;
+    int offset_seconds = 0;
+
+    if (!parse_rfc3339_timestamp(argv[1], &year, &month, &day, &hour, &minute, &second, &offset_seconds))
+    {
+        printf("Invalid RFC3339 timestamp. Expected YYYY-MM-DDTHH:MM:SSZ or YYYY-MM-DDTHH:MM:SS+/-HH:MM\n");
+        return 1;
+    }
+
+    int64_t local_epoch = epoch_seconds_from_ymdhms(year, month, day, hour, minute, second);
+    int64_t utc_epoch = local_epoch - (int64_t)offset_seconds;
+
+    struct timeval tv = {
+        .tv_sec = (time_t)utc_epoch,
+        .tv_usec = 0,
+    };
+
+    if (settimeofday(&tv, NULL) != 0)
+    {
+        printf("Failed to set system time.\n");
+        return 1;
+    }
+
+    s_utc_offset_seconds = (int32_t)offset_seconds;
+    s_utc_offset_is_set = 1;
+    s_time_initialized = 1;
+
+    struct tm utc_tm;
+    gmtime_r(&tv.tv_sec, &utc_tm);
+
+    printf("System UTC time set to %04d-%02d-%02dT%02d:%02d:%02dZ\n",
+           utc_tm.tm_year + 1900,
+           utc_tm.tm_mon + 1,
+           utc_tm.tm_mday,
+           utc_tm.tm_hour,
+           utc_tm.tm_min,
+           utc_tm.tm_sec);
+    printf("Stored UTC offset: %+03d:%02d (%ld seconds)\n",
+           offset_seconds / 3600,
+           (offset_seconds < 0 ? -offset_seconds : offset_seconds) % 3600 / 60,
+           (long)s_utc_offset_seconds);
+
     return 0;
 }
 
@@ -746,7 +1033,7 @@ static int cmd_power_on(int argc, char **argv)
     return 0;
 }
 
-static int cmd_demo_info(int argc, char **argv)
+static int cmd_list(int argc, char **argv)
 {
     (void)argc;
     (void)argv;
@@ -759,21 +1046,32 @@ static int cmd_demo_info(int argc, char **argv)
     printf("  demo-symbols   - toggle symbol groups\n");
     printf("  demo-edge      - run edge case tests\n");
     printf("  demo-all       - run all demos\n");
+    printf("  bbcr4          - send \"BBC R4\" command\n");
+    printf("  mode10         - send \"Mode 10\" command\n");
+    printf("  mode11         - send \"Mode 11\" command\n");
     printf("  power-on       - run display power-on test sequence\n");
-    printf("  time-sync <ts> - send UTC timestamp (YYYYMMDDTHHmmss)\n");
+    printf("  time-sync      - send RDS MJD time from ESP32 UTC clock\n");
+    printf("  set-time <ts>  - set ESP32 UTC clock from RFC3339\n");
+    if (s_utc_offset_is_set)
+    {
+        printf("  stored-offset  - %+03ld:%02ld (%ld seconds)\n",
+               (long)(s_utc_offset_seconds / 3600),
+               (long)((s_utc_offset_seconds < 0 ? -s_utc_offset_seconds : s_utc_offset_seconds) % 3600 / 60),
+               (long)s_utc_offset_seconds);
+    }
     printf("  help           - list registered commands\n");
     return 0;
 }
 
 static void register_console_commands(void)
 {
-    const esp_console_cmd_t info_cmd = {
-        .command = "demo-info",
+    const esp_console_cmd_t list_cmd = {
+        .command = "list",
         .help = "Show display information and available demo commands",
         .hint = NULL,
-        .func = &cmd_demo_info,
+        .func = &cmd_list,
     };
-    ESP_ERROR_CHECK(esp_console_cmd_register(&info_cmd));
+    ESP_ERROR_CHECK(esp_console_cmd_register(&list_cmd));
 
     const esp_console_cmd_t charset_cmd = {
         .command = "demo-charset",
@@ -782,6 +1080,30 @@ static void register_console_commands(void)
         .func = &cmd_demo_charset,
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&charset_cmd));
+
+    const esp_console_cmd_t bbcr4_cmd = {
+        .command = "bbcr4",
+        .help = "Display BBC radio 4 info",
+        .hint = NULL,
+        .func = &cmd_bbcr4,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&bbcr4_cmd));
+
+    const esp_console_cmd_t mode10_cmd = {
+        .command = "mode10",
+        .help = "Send \"Mode 10\" command",
+        .hint = NULL,
+        .func = &cmd_mode10,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&mode10_cmd));
+
+    const esp_console_cmd_t mode11_cmd = {
+        .command = "mode11",
+        .help = "Send \"Mode 11\" command",
+        .hint = NULL,
+        .func = &cmd_mode11,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&mode11_cmd));
 
     const esp_console_cmd_t extended_cmd = {
         .command = "demo-extended",
@@ -830,6 +1152,14 @@ static void register_console_commands(void)
         .func = &cmd_time_sync,
     };
     ESP_ERROR_CHECK(esp_console_cmd_register(&time_sync_cmd));
+
+    const esp_console_cmd_t set_time_cmd = {
+        .command = "set-time",
+        .help = "Set ESP32 UTC clock from RFC3339 timestamp",
+        .hint = "<YYYY-MM-DDTHH:MM:SS+/-HH:MM|Z>",
+        .func = &cmd_set_time,
+    };
+    ESP_ERROR_CHECK(esp_console_cmd_register(&set_time_cmd));
 }
 
 static void start_console_repl(void)

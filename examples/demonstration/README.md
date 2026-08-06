@@ -16,7 +16,9 @@ The demonstration offers an interactive menu with five demonstrations:
 
 5. **Run All** — Executes all demonstrations in sequence.
 
-6. **Time Sync (UTC)** — Prompts for a UTC timestamp in `YYYYMMDDTHHmmss` format and sends a hardware time-sync update (`0x60` command). Century (`YYYY` -> `YY`) and seconds are ignored by protocol.
+6. **Set Time (RFC3339)** — Sets the ESP32 UTC clock from an RFC3339 timestamp (for example `2026-08-06T13:51:00+01:00`) and stores the local UTC offset.
+
+7. **Time Sync (RDS MJD)** — Uses the current ESP32 UTC clock and stored local offset to build an RDS-style MJD time payload, then sends a hardware time-sync update. This is gated on `set-time` having been called first.
 
 ## Building and Running
 
@@ -109,17 +111,17 @@ Press return to continue... _
 ...
 ```
 
-### Time Sync Example
+### Set-Time + Time-Sync Example
 
 ```
 Select (1–7): 6
 
-=== HARDWARE TIME SYNC (0x60) ===
-Enter UTC timestamp as YYYYMMDDTHHmmss (example: 20260714T154500).
-Century and seconds are ignored by the display protocol.
+opelxid> set-time 2026-08-06T13:51:00+01:00
+System UTC time set to 2026-08-06T12:51:00Z
+Stored UTC offset: +01:00 (3600 seconds)
 
-Timestamp: 20260714T154500
-Time sync sent: input=20260714T154500 -> day=14 month=07 year=26 hour=15 minute=45 (seconds ignored: 00)
+opelxid> time-sync
+Time sync sent: MJD=61257 UTC=2026-08-06T12:51:00Z offset=+01:00
 ```
 
 ## See Also
