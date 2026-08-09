@@ -445,7 +445,7 @@ static void mode10(opel_mid_handle_t display, opel_mid_type_t type)
     // int width = get_display_width(type);
     uint8_t text[16];
 
-    text[0] = 0x10; // 0b0001000 => 0b00100000 with parity (0x20).
+    text[0] = 0x08; // 0b0001000 => 0b00100000 with parity (0x20).
     text[1] = 'M';
     text[2] = 'O';
     text[3] = 'D';
@@ -476,7 +476,7 @@ static void mode11(opel_mid_handle_t display, opel_mid_type_t type)
     // int width = get_display_width(type);
     uint8_t text[16];
 
-    text[0] = 0x11; // 0b0001001 => 0b00100011 with parity (0x23).
+    text[0] = 0x81; // 0b0001001 => 0b00100011 with parity (0x23).
     text[1] = 'M';
     text[2] = 'O';
     text[3] = 'D';

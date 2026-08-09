@@ -110,16 +110,15 @@ static esp_err_t expect_bus_levels(const opel_mid_config_t *cfg,
  */
 static uint8_t apply_odd_parity(uint8_t data)
 {
-    /* Work on bits [7:1] only */
-    uint8_t v = (data >> 1) & 0x7Fu;
-    uint8_t ones = 0u;
-    while (v)
-    {
-        ones += v & 1u;
-        v >>= 1u;
-    }
-    uint8_t parity = (ones % 2u == 0u) ? 1u : 0u;
-    return (data & 0xFEu) | parity;
+    /* Data is sent in bits [7:1] only; original bit 7 is lost */
+    uint8_t v = (uint8_t)((data << 1) & 0xFEu);
+
+    /* Assume we need the odd parity bit*/
+    uint8_t p = v | 0x01;
+    p = p ^ (p >> 4);
+    p = p ^ (p >> 2);
+    p = p ^ (p >> 1);
+    return v | (p & 0x01u);
 }
 
 /* ── Low-level bus ────────────────────────────────────────────────────────── */
@@ -304,7 +303,7 @@ static esp_err_t bus_send_byte(const opel_mid_config_t *cfg, uint8_t byte)
 
     /* 7. Release SDA (open-drain pull-up) */
     sda_high(cfg);
-    ets_delay_us(T_SETUP_US);
+    ets_delay_us(500u); /* Allow slave to take control of SDA */
 
     // At this point the slave will pull SDA low for an ACK or leave high for a NACK.
 
@@ -687,10 +686,9 @@ esp_err_t opel_mid_send(opel_mid_handle_t handle,
      * so we mask off bit 0 of the caller-supplied flags before passing in.
      */
     uint8_t sym[3] = {
-        apply_odd_parity(symbols->radio & 0xFEu), /* Radio Status */
-        apply_odd_parity(symbols->tape & 0xFEu),  /* Tape  Status */
-        apply_odd_parity(symbols->cd & 0xFEu),    /* CD    Status (10-digit only) */
-    };
+        symbols->radio,
+        symbols->tape,
+        symbols->cd};
 
     /*
      * Address byte: the 7-bit slave address is placed in bits[7:1] and odd
@@ -712,7 +710,7 @@ esp_err_t opel_mid_send(opel_mid_handle_t handle,
     }
 
     /* 1. Slave address */
-    ret = bus_send_byte_with_retry(cfg, addr_byte);
+    ret = bus_send_byte_with_retry(cfg, apply_odd_parity(addr_byte));
     if (ret != ESP_OK)
     {
         ESP_LOGE(TAG, "opel_mid_send: address byte transmission failed (0x%02X)", addr_byte);
@@ -724,7 +722,7 @@ esp_err_t opel_mid_send(opel_mid_handle_t handle,
     /* 2. Symbol bytes (2 for TID-8, 3 for TID-10/MID) */
     for (uint8_t i = 0u; i < dev->sym_bytes; i++)
     {
-        ret = bus_send_byte_with_retry(cfg, sym[i]);
+        ret = bus_send_byte_with_retry(cfg, apply_odd_parity(sym[i]));
         if (ret != ESP_OK)
         {
             ESP_LOGE(TAG, "opel_mid_send: symbol byte %u transmission failed (0x%02X)", i, sym[i]);
@@ -739,7 +737,7 @@ esp_err_t opel_mid_send(opel_mid_handle_t handle,
     for (uint8_t i = 0u; i < dev->data_bytes; i++)
     {
         char c = (i < text_len) ? text[i] : ' ';
-        ret = bus_send_byte_with_retry(cfg, char_to_display_byte(c));
+        ret = bus_send_byte_with_retry(cfg, apply_odd_parity(char_to_display_byte(c)));
         if (ret != ESP_OK)
         {
             ESP_LOGE(TAG, "opel_mid_send: data byte %u transmission failed (char='%c')", i, c);
@@ -782,7 +780,7 @@ esp_err_t opel_mid10_send(opel_mid_handle_t handle,
     }
 
     /* 1. Slave address */
-    ret = bus_send_byte_with_retry(cfg, addr_byte);
+    ret = bus_send_byte_with_retry(cfg, apply_odd_parity(addr_byte));
     if (ret != ESP_OK)
     {
         ESP_LOGE(TAG, "opel_mid_send: address byte transmission failed (0x%02X)", addr_byte);
