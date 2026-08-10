@@ -667,30 +667,27 @@ esp_err_t opel_mid_send(opel_mid_handle_t handle,
     }
 
     /*
-     * Build the three symbol bytes.
+     * Build the three symbol bytes (7-bit values before parity is added).
      *
-     * Each symbol byte layout (bit 0 = parity, per §Format der Status-Bytes):
+     *   Radio Status (7-bit value)
+     *     bit 6  COMMA          bit 5  RDS
+     *     bit 4  TP             bit 3  STEREO
+     *     bit 2  0              bit 1  AS
+     *     bit 0  TP_BRACKET
      *
-     *   Radio Status (byte 1)
-     *     bit 7  COMMA          bit 6  RDS
-     *     bit 5  TP             bit 4  STEREO
-     *     bit 3  0              bit 2  AS
-     *     bit 1  TP_BRACKET     bit 0  parity
+     *   Tape Status (7-bit value)
+     *     bit 6  CD_IN          bit 5  DOLBY_C
+     *     bit 4  DOLBY_B        bit 3  CR
+     *     bit 2  CPS            bit 1  0
+     *     bit 0  0
      *
-     *   Tape Status (byte 2)
-     *     bit 7  CD_IN          bit 6  DOLBY_C
-     *     bit 5  DOLBY_B        bit 4  CR
-     *     bit 3  CPS            bit 2  0
-     *     bit 1  0              bit 0  parity
+     *   CD Status (7-bit value, 10-digit only)
+     *     bit 6  0              bit 5  TRACK
+     *     bit 4  RDM            bit 3  PGM
+     *     bit 2  DISC           bit 1  0
+     *     bit 0  0
      *
-     *   CD Status (byte 3, 10-digit only)
-     *     bit 7  0              bit 6  TRACK
-     *     bit 5  RDM            bit 4  PGM
-     *     bit 3  DISC           bit 2  0
-     *     bit 1  0              bit 0  parity
-     *
-     * apply_odd_parity() treats bits[7:1] as data and computes bit[0],
-     * so we mask off bit 0 of the caller-supplied flags before passing in.
+     * Parity will be computed and applied during transmission.
      */
     uint8_t sym[3] = {
         symbols->radio,
@@ -826,15 +823,42 @@ esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
 
     struct opel_mid_dev_t *dev = handle;
     const opel_mid_config_t *cfg = &dev->config;
-    uint8_t rawPacket[5];
 
-    /* RDS CT packet: control byte + 4-byte RDS time stream from receiver
-     * Parity will be applied during transmission by bus_send_byte_with_retry(). */
-    rawPacket[0] = OPEL_MID_RDS_CT_GROUP; /* RDS Clock Time group identifier */
-    rawPacket[1] = rds_time_block[0];     /* Offset/status byte */
-    rawPacket[2] = rds_time_block[1];     /* Minute byte */
-    rawPacket[3] = rds_time_block[2];     /* Hour byte */
-    rawPacket[4] = rds_time_block[3];     /* MJD bits */
+    /* Decode 4-byte RDS time block into components */
+    uint8_t offset_byte = rds_time_block[0] & 0x1F;
+    uint8_t mjd_bits_16_14 = (rds_time_block[0] >> 5) & 0x07;
+    uint8_t utc_minute = rds_time_block[1] & 0x3F;
+    uint8_t mjd_bits_13_12 = (rds_time_block[1] >> 6) & 0x03;
+    uint8_t utc_hour = rds_time_block[2] & 0x1F;
+    uint8_t mjd_bits_11_9 = (rds_time_block[2] >> 5) & 0x07;
+    uint8_t mjd_bits_8_1 = rds_time_block[3];
+
+    /* Reconstruct 17-bit MJD from scattered bits */
+    uint32_t mjd = ((uint32_t)mjd_bits_16_14 << 14) |
+                   ((uint32_t)mjd_bits_13_12 << 12) |
+                   ((uint32_t)mjd_bits_11_9 << 9) |
+                   ((uint32_t)mjd_bits_8_1 << 1);
+
+    /* Decode offset: sign bit in bit 5, value in bits[4:0] */
+    int8_t local_offset_half_hours = (int8_t)((offset_byte & 0x20) ? -(offset_byte & 0x1F) : (offset_byte & 0x1F));
+
+    /* Encode into 8-byte transmission frame using the same layout as the original implementation */
+    uint8_t rawPacket[8];
+
+    rawPacket[0] = OPEL_MID_RDS_CT_GROUP;
+
+    uint8_t offset_abs = (uint8_t)((local_offset_half_hours < 0) ? -local_offset_half_hours : local_offset_half_hours);
+    uint8_t offsetField = (local_offset_half_hours < 0) ? (uint8_t)(offset_abs | 0x20u) : offset_abs;
+    rawPacket[1] = offsetField;
+
+    rawPacket[2] = utc_minute;
+    rawPacket[3] = utc_hour;
+
+    /* 17-bit MJD spread across protocol bytes */
+    rawPacket[4] = (mjd >> 9) & 0x7F; /* Upper bits */
+    rawPacket[5] = (mjd >> 2) & 0x7F; /* Middle block */
+    rawPacket[6] = ((mjd & 0x03) << 5) | 0x03;
+    rawPacket[7] = (mjd >> 14) & 0x07;
 
     esp_err_t ret = bus_start(cfg);
     if (ret != ESP_OK)
@@ -862,7 +886,7 @@ esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
         return ret;
     }
 
-    ESP_LOGI(TAG, "Set time sync: RDS bytes [0x%02X 0x%02X 0x%02X 0x%02X]",
-             rds_time_block[0], rds_time_block[1], rds_time_block[2], rds_time_block[3]);
+    ESP_LOGI(TAG, "Set time sync: mjd=%lu utc=%02u:%02u offset_half_hours=%d",
+             (unsigned long)mjd, utc_hour, utc_minute, local_offset_half_hours);
     return ESP_OK;
 }
