@@ -29,16 +29,22 @@ static const char *TAG = "opel_mid";
  * https://wiki.carluccio.de/index.php/Opel_TID.
  * Minimums are used throughout; increase if the display proves unreliable.
  */
-#define T_SCL_HIGH_US 50u       /* TSCLHmin */
-#define T_SCL_LOW_US 50u        /* TSCLLmin */
-#define T_SETUP_US 5u           /* Ts (data setup before SCL high) */
-#define T_HOLD_US 5u            /* Th (data hold after SCL low) */
-#define T_MRQ_US 100u           /* Generic MRQ pulse width */
-#define T_SDA_WAIT_US 100u      /* Poll interval waiting for slave SDA response */
-#define T_SDA_TIMEOUT_US 15000u /* T1max: slave must respond within 15 ms */
-#define T_POWER_ON_T1_MS 100u   /* Power-on test T1 minimum */
-#define T_POWER_ON_T2_US 500u   /* Power-on test T2 minimum */
-#define T_POWER_ON_T3_US 1000u  /* Power-on test T3 minimum */
+#define T_SCL_HIGH_US 50u              /* TSCLHmin */
+#define T_SCL_LOW_US 50u               /* TSCLLmin */
+#define T_SETUP_US 5u                  /* Ts (data setup before SCL high) */
+#define T_HOLD_US 5u                   /* Th (data hold after SCL low) */
+#define T_MRQ_US 100u                  /* Generic MRQ pulse width */
+#define T_SDA_WAIT_US 100u             /* Poll interval waiting for slave SDA response */
+#define T_SDA_TIMEOUT_US 15000u        /* T1max: slave must respond within 15 ms */
+#define T_POWER_ON_T1_MS 100u          /* Power-on test T1 minimum */
+#define T_POWER_ON_T2_US 500u          /* Power-on test T2 minimum */
+#define T_POWER_ON_T3_US 1000u         /* Power-on test T3 minimum */
+#define T_SCL_STRETCH_TIMEOUT_US 1000u /* Clock stretching timeout (1 ms) */
+#define T_ACK_CONTROL_US 500u          /* SDA release time for ACK cycle */
+#define OPEL_MID_RDS_CT_GROUP 0x47u    /* RDS Clock Time group identifier */
+
+/* Define for opel_mid10_send frame structure: address + data/mode bytes */
+#define OPEL_MID_RDS_FRAME_BYTES 11u /* Total data/mode bytes in RDS frame */
 
 /* Debug override: disable power-on line-state checks while keeping timing/pulses. */
 #define OPEL_MID_DEBUG_SKIP_POWER_ON_LEVEL_CHECKS 0u
@@ -272,16 +278,15 @@ static esp_err_t bus_send_byte(const opel_mid_config_t *cfg, uint8_t byte)
         /* 4. Wait for slave to release SCL (clock stretching) with timeout.
          *    The slave may hold SCL low to signal "I'm busy", but must
          *    release it within a reasonable time. Per the spec, SCL must
-         *    be high for at least T_SCL_HIGH_US (50 µs), so we use 1 ms
-         *    as a safety margin. If exceeded, this indicates a fault. */
-        uint32_t stretch_timeout_us = 1000u; /* 1 ms */
+         *    be high for at least T_SCL_HIGH_US (50 µs), so we use a safety
+         *    margin. If exceeded, this indicates a fault. */
         uint32_t elapsed_us = 0u;
-        while (get_scl(cfg) == 0 && elapsed_us < stretch_timeout_us)
+        while (get_scl(cfg) == 0 && elapsed_us < T_SCL_STRETCH_TIMEOUT_US)
         {
             ets_delay_us(10u);
             elapsed_us += 10u;
         }
-        if (elapsed_us >= stretch_timeout_us)
+        if (elapsed_us >= T_SCL_STRETCH_TIMEOUT_US)
         {
             /* SCL stuck low: slave is unresponsive or bus is shorted. */
             ESP_LOGE(TAG, "SCL clock stretch timeout at bit %d (possibly shorted to ground)", bit_idx);
@@ -303,7 +308,7 @@ static esp_err_t bus_send_byte(const opel_mid_config_t *cfg, uint8_t byte)
 
     /* 7. Release SDA (open-drain pull-up) */
     sda_high(cfg);
-    ets_delay_us(500u); /* Allow slave to take control of SDA */
+    ets_delay_us(T_ACK_CONTROL_US); /* Allow slave to take control of SDA */
 
     // At this point the slave will pull SDA low for an ACK or leave high for a NACK.
 
@@ -364,53 +369,55 @@ static esp_err_t bus_stop(const opel_mid_config_t *cfg)
 /**
  * @brief Send one byte with automatic retry on parity error.
  *
- * Retries up to OPEL_MID_MAX_RETRIES times; on final failure the caller
- * should issue bus_stop() — the display will show blank characters
- * (§Fehlerbehandlung).
+ * Takes a raw data byte, applies odd parity, and transmits it. Retries up to
+ * OPEL_MID_MAX_RETRIES times; on final failure the caller should issue
+ * bus_stop() — the display will show blank characters (§Fehlerbehandlung).
  *
- * @param cfg  Device config.
- * @param byte Fully-formed byte: data in bits[7:1], odd parity in bit[0].
- *             Use apply_odd_parity() or char_to_display_byte() to build it.
+ * @param cfg   Device config.
+ * @param byte  Raw data byte (bits[7:0]); parity is computed and applied here.
  * @return ESP_OK on success, ESP_ERR_INVALID_RESPONSE after all retries.
  */
 static esp_err_t bus_send_byte_with_retry(const opel_mid_config_t *cfg,
                                           uint8_t byte)
 {
+    /* Apply odd parity to the raw byte */
+    uint8_t byte_with_parity = apply_odd_parity(byte);
+
     for (unsigned i = 0u; i < OPEL_MID_MAX_RETRIES; i++)
     {
-        esp_err_t ret = bus_send_byte(cfg, byte);
+        esp_err_t ret = bus_send_byte(cfg, byte_with_parity);
         if (ret == ESP_OK)
         {
             return ESP_OK;
         }
         ESP_LOGW(TAG, "Parity error on byte 0x%02X, retry %u/%u",
-                 byte, i + 1u, OPEL_MID_MAX_RETRIES);
+                 byte_with_parity, i + 1u, OPEL_MID_MAX_RETRIES);
     }
     return ESP_ERR_INVALID_RESPONSE;
 }
 
 /**
- * @brief Encode an ASCII character as a display byte ready for transmission.
+ * @brief Encode an ASCII character as a display byte (without parity).
  *
  * Each byte on the bus carries 7 data bits in bits[7:1] and an odd parity
  * bit in bit[0].  The display's character set maps 1-to-1 to ASCII: the
  * 7-bit ASCII code is placed directly into bits[7:1].
  *
- * Verified against observed wire values, e.g.:
- *   'A' (0x41) → 0x83   'B' (0x42) → 0x85   ' ' (0x20) → 0x40
+ * The parity bit will be computed and applied during transmission by
+ * bus_send_byte_with_retry().
  *
  * Characters outside the printable ASCII range (0x20–0x7E) are substituted
  * with a space.
  *
  * @param c  ASCII character.
- * @return   Byte with data in bits[7:1] and odd parity in bit[0].
+ * @return   Raw byte with data in bits[7:1]; parity will be applied on send.
  */
 static uint8_t char_to_display_byte(char c)
 {
     uint8_t ascii = ((uint8_t)c >= 0x20u && (uint8_t)c <= 0x7Eu)
                         ? (uint8_t)c
                         : 0x20u;
-    return apply_odd_parity((uint8_t)(ascii << 1u));
+    return (uint8_t)(ascii << 1u);
 }
 
 /* ── Public API ───────────────────────────────────────────────────────────── */
@@ -691,11 +698,9 @@ esp_err_t opel_mid_send(opel_mid_handle_t handle,
         symbols->cd};
 
     /*
-     * Address byte: the 7-bit slave address is placed in bits[7:1] and odd
-     * parity applied to bit[0], consistent with all other bus bytes.
+     * Address byte: the 7-bit slave address is placed in bits[7:1].
+     * Parity will be applied by bus_send_byte_with_retry().
      */
-    // uint8_t addr_byte = apply_odd_parity((uint8_t)(dev->addr << 1u));
-    // !!PDS: Hacking try on address.  Address does not appear to have parity.
     uint8_t addr_byte = dev->addr;
 
     /* ── Transmit frame (§Format einer Nachricht) ─────────────────────────── */
@@ -710,7 +715,7 @@ esp_err_t opel_mid_send(opel_mid_handle_t handle,
     }
 
     /* 1. Slave address */
-    ret = bus_send_byte_with_retry(cfg, apply_odd_parity(addr_byte));
+    ret = bus_send_byte_with_retry(cfg, addr_byte);
     if (ret != ESP_OK)
     {
         ESP_LOGE(TAG, "opel_mid_send: address byte transmission failed (0x%02X)", addr_byte);
@@ -722,7 +727,7 @@ esp_err_t opel_mid_send(opel_mid_handle_t handle,
     /* 2. Symbol bytes (2 for TID-8, 3 for TID-10/MID) */
     for (uint8_t i = 0u; i < dev->sym_bytes; i++)
     {
-        ret = bus_send_byte_with_retry(cfg, apply_odd_parity(sym[i]));
+        ret = bus_send_byte_with_retry(cfg, sym[i]);
         if (ret != ESP_OK)
         {
             ESP_LOGE(TAG, "opel_mid_send: symbol byte %u transmission failed (0x%02X)", i, sym[i]);
@@ -737,7 +742,7 @@ esp_err_t opel_mid_send(opel_mid_handle_t handle,
     for (uint8_t i = 0u; i < dev->data_bytes; i++)
     {
         char c = (i < text_len) ? text[i] : ' ';
-        ret = bus_send_byte_with_retry(cfg, apply_odd_parity(char_to_display_byte(c)));
+        ret = bus_send_byte_with_retry(cfg, char_to_display_byte(c));
         if (ret != ESP_OK)
         {
             ESP_LOGE(TAG, "opel_mid_send: data byte %u transmission failed (char='%c')", i, c);
@@ -780,22 +785,22 @@ esp_err_t opel_mid10_send(opel_mid_handle_t handle,
     }
 
     /* 1. Slave address */
-    ret = bus_send_byte_with_retry(cfg, apply_odd_parity(addr_byte));
+    ret = bus_send_byte_with_retry(cfg, addr_byte);
     if (ret != ESP_OK)
     {
-        ESP_LOGE(TAG, "opel_mid_send: address byte transmission failed (0x%02X)", addr_byte);
+        ESP_LOGE(TAG, "opel_mid10_send: address byte transmission failed (0x%02X)", addr_byte);
         bus_stop(cfg);
         bus_reset_to_idle(cfg); /* Extra recovery after stop */
         return ret;
     }
 
-    for (uint8_t i = 0u; i < 11; i++)
+    /* 2. Data/mode bytes (11 bytes for RDS frame format) */
+    for (uint8_t i = 0u; i < OPEL_MID_RDS_FRAME_BYTES; i++)
     {
-        // char c = (i < text_len) ? text[i] : ' ';
-        ret = bus_send_byte_with_retry(cfg, apply_odd_parity(data[i]));
+        ret = bus_send_byte_with_retry(cfg, data[i]);
         if (ret != ESP_OK)
         {
-            ESP_LOGE(TAG, "opel_mid_send: data byte %u transmission failed (data=0x%02X)", i, data[i]);
+            ESP_LOGE(TAG, "opel_mid10_send: data byte %u transmission failed (data=0x%02X)", i, data[i]);
             bus_stop(cfg);
             bus_reset_to_idle(cfg);
             return ret;
@@ -823,12 +828,13 @@ esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
     const opel_mid_config_t *cfg = &dev->config;
     uint8_t rawPacket[5];
 
-    /* RDS CT packet: control byte + 4-byte RDS time stream from receiver */
-    rawPacket[0] = apply_odd_parity(0x47);              /* RDS Clock Time group identifier */
-    rawPacket[1] = apply_odd_parity(rds_time_block[0]); /* Offset/status byte */
-    rawPacket[2] = apply_odd_parity(rds_time_block[1]); /* Minute byte */
-    rawPacket[3] = apply_odd_parity(rds_time_block[2]); /* Hour byte */
-    rawPacket[4] = apply_odd_parity(rds_time_block[3]); /* MJD bits */
+    /* RDS CT packet: control byte + 4-byte RDS time stream from receiver
+     * Parity will be applied during transmission by bus_send_byte_with_retry(). */
+    rawPacket[0] = OPEL_MID_RDS_CT_GROUP; /* RDS Clock Time group identifier */
+    rawPacket[1] = rds_time_block[0];     /* Offset/status byte */
+    rawPacket[2] = rds_time_block[1];     /* Minute byte */
+    rawPacket[3] = rds_time_block[2];     /* Hour byte */
+    rawPacket[4] = rds_time_block[3];     /* MJD bits */
 
     esp_err_t ret = bus_start(cfg);
     if (ret != ESP_OK)
