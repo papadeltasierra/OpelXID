@@ -801,10 +801,15 @@ static void demo_edge_cases(opel_mid_handle_t display, opel_mid_type_t type)
 
 /**
  * @brief Demo: Hardware time sync from ESP32 UTC clock + stored local offset.
+ *
+ * Encodes the current UTC time and local offset into the exact RDS byte stream
+ * format that would be received from an actual RDS radio decoder, then sends it
+ * to the display. This demonstrates how a real application would receive CT
+ * (Clock Time) groups from an RDS tuner and forward them directly to the display.
  */
 static void demo_time_sync(opel_mid_handle_t display)
 {
-    printf("\n=== HARDWARE TIME SYNC (RDS MJD) ===\n");
+    printf("\n=== HARDWARE TIME SYNC (RDS CLOCK TIME) ===\n");
 
     if (!s_time_initialized || !s_utc_offset_is_set)
     {
@@ -829,14 +834,42 @@ static void demo_time_sync(opel_mid_handle_t display)
     struct tm utc_tm;
     gmtime_r(&now_utc, &utc_tm);
 
+    /* Calculate Modified Julian Date from Unix epoch timestamp */
     uint32_t mjd = (uint32_t)((int64_t)now_utc / 86400LL + 40587LL);
-    int8_t offset_half_hours = (int8_t)(s_utc_offset_seconds / 1800);
 
-    esp_err_t ret = opel_mid_set_time(display,
-                                      mjd,
-                                      (uint8_t)utc_tm.tm_hour,
-                                      (uint8_t)utc_tm.tm_min,
-                                      offset_half_hours);
+    /* Encode UTC time and offset into exact RDS byte stream format.
+     *
+     * RDS Clock Time (CT) group byte layout:
+     *   Byte 0: [sign(1) | offset_value(4) | mjd_bits_16_14(3)]
+     *           Offset: 0-31 half-hour steps (-12:00 to +14:00)
+     *           Sign bit: 0=east/positive, 1=west/negative
+     *   Byte 1: [minute_5_0(6) | mjd_bits_13_12(2)]
+     *   Byte 2: [hour_4_0(5) | mjd_bits_11_9(3)]
+     *   Byte 3: [mjd_bits_8_1(8)]
+     *
+     * This format allows real RDS receivers to pass their CT bytes directly.
+     */
+    uint8_t rds_time_block[4];
+
+    /* Encode offset with sign bit and value bits */
+    int offset_half_hours = (int)(s_utc_offset_seconds / 1800);
+    uint8_t offset_abs = (offset_half_hours < 0) ? -offset_half_hours : offset_half_hours;
+    uint8_t offset_byte = (offset_half_hours < 0) ? (uint8_t)(offset_abs | 0x20u) : offset_abs;
+
+    /* Extract MJD bits for packing into bytes 0-3 */
+    uint8_t mjd_bit_16_14 = (uint8_t)((mjd >> 14) & 0x07); /* Bits 16-14 of 17-bit MJD */
+    uint8_t mjd_bit_13_12 = (uint8_t)((mjd >> 12) & 0x03); /* Bits 13-12 */
+    uint8_t mjd_bit_11_9 = (uint8_t)((mjd >> 9) & 0x07);   /* Bits 11-9 */
+    uint8_t mjd_bit_8_1 = (uint8_t)((mjd >> 1) & 0xFF);    /* Bits 8-1 */
+
+    /* Pack into 4-byte RDS format */
+    rds_time_block[0] = (uint8_t)((offset_byte & 0x1F) | (mjd_bit_16_14 << 5));
+    rds_time_block[1] = (uint8_t)(((uint8_t)utc_tm.tm_min & 0x3F) | (mjd_bit_13_12 << 6));
+    rds_time_block[2] = (uint8_t)(((uint8_t)utc_tm.tm_hour & 0x1F) | (mjd_bit_11_9 << 5));
+    rds_time_block[3] = mjd_bit_8_1;
+
+    /* Send the exact RDS byte stream to the display */
+    esp_err_t ret = opel_mid_set_time(display, rds_time_block);
 
     if (ret != ESP_OK)
     {
@@ -844,7 +877,9 @@ static void demo_time_sync(opel_mid_handle_t display)
         return;
     }
 
-    printf("Time sync sent: MJD=%lu UTC=%04d-%02d-%02dT%02d:%02d:%02dZ offset=%+03ld:%02ld\n",
+    printf("Time sync sent (RDS bytes): [0x%02X 0x%02X 0x%02X 0x%02X]\n",
+           rds_time_block[0], rds_time_block[1], rds_time_block[2], rds_time_block[3]);
+    printf("  MJD=%lu UTC=%04d-%02d-%02dT%02d:%02d:%02dZ offset=%+03d:%02d\n",
            (unsigned long)mjd,
            utc_tm.tm_year + 1900,
            utc_tm.tm_mon + 1,
@@ -852,8 +887,8 @@ static void demo_time_sync(opel_mid_handle_t display)
            utc_tm.tm_hour,
            utc_tm.tm_min,
            utc_tm.tm_sec,
-           (long)(s_utc_offset_seconds / 3600),
-           (long)((s_utc_offset_seconds < 0 ? -s_utc_offset_seconds : s_utc_offset_seconds) % 3600 / 60));
+           (int)(s_utc_offset_seconds / 3600),
+           (int)((s_utc_offset_seconds < 0 ? -s_utc_offset_seconds : s_utc_offset_seconds) % 3600 / 60));
     wait_between_steps();
 }
 

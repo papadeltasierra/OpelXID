@@ -177,24 +177,31 @@ extern "C"
                               const uint8_t *data);
 
     /**
-     * @brief Send an RDS-style clock/time update frame.
+     * @brief Send an RDS-style clock/time update frame with exact RDS byte stream.
      *
-     * @param handle                   Handle obtained from opel_mid_init().
-     * @param mjd                      Modified Julian Date (17-bit value).
-     * @param utc_hour                 UTC hour (0–23).
-     * @param utc_minute               UTC minute (0–59).
-     * @param local_offset_half_hours  Local offset from UTC in 30-minute steps.
-     *                                 Negative values indicate west of UTC.
+     * Sends a time/date frame containing the exact RDS byte stream as would be
+     * received from an RDS radio receiver. In real-world applications, these 4 bytes
+     * would come directly from an RDS tuner's Clock Time (CT) group decoder.
+     *
+     * Packet format:
+     *   Byte 0: 0x47 (RDS CT group identifier)
+     *   Bytes 1-4: Exact RDS time block from receiver
+     *     - Offset field (bits encode local time offset in 30-minute steps)
+     *     - UTC minute (0–59)
+     *     - UTC hour (0–23)
+     *     - MJD (Modified Julian Date) bits
+     *
+     * @param handle         Handle obtained from opel_mid_init().
+     * @param rds_time_block Pointer to 4-byte RDS Clock Time block.
+     *                       Layout: [offset | minute | hour | mjd_bits]
+     *                       These bytes should come directly from an RDS decoder.
      *
      * @return ESP_OK              on success.
-     * @return ESP_ERR_INVALID_ARG if input is out of range.
+     * @return ESP_ERR_INVALID_ARG if handle or rds_time_block is NULL.
      * @return ESP_ERR_TIMEOUT     if the slave does not respond.
      */
     esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
-                                uint32_t mjd,
-                                uint8_t utc_hour,
-                                uint8_t utc_minute,
-                                int8_t local_offset_half_hours);
+                                const uint8_t *rds_time_block);
 
 #ifdef __cplusplus
 }

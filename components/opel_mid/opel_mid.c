@@ -812,42 +812,23 @@ esp_err_t opel_mid10_send(opel_mid_handle_t handle,
 }
 
 esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
-                            uint32_t mjd,
-                            uint8_t utc_hour,
-                            uint8_t utc_minute,
-                            int8_t local_offset_half_hours)
+                            const uint8_t *rds_time_block)
 {
-    if (!handle)
+    if (!handle || !rds_time_block)
     {
-        return ESP_ERR_INVALID_ARG;
-    }
-    if (mjd > 0x1FFFFu || utc_hour > 23u || utc_minute > 59u ||
-        local_offset_half_hours < -31 || local_offset_half_hours > 31)
-    {
-        ESP_LOGE(TAG, "opel_mid_set_time: invalid args mjd=%lu utc=%02u:%02u offset_half_hours=%d",
-                 (unsigned long)mjd, utc_hour, utc_minute, local_offset_half_hours);
         return ESP_ERR_INVALID_ARG;
     }
 
     struct opel_mid_dev_t *dev = handle;
     const opel_mid_config_t *cfg = &dev->config;
-    uint8_t rawPacket[8];
+    uint8_t rawPacket[5];
 
-    /* RDS-style CT payload with MJD, UTC time, and local offset. */
-    rawPacket[0] = apply_odd_parity(0x47);
-
-    uint8_t offset_abs = (uint8_t)((local_offset_half_hours < 0) ? -local_offset_half_hours : local_offset_half_hours);
-    uint8_t offsetField = (local_offset_half_hours < 0) ? (uint8_t)(offset_abs | 0x20u) : offset_abs;
-    rawPacket[1] = apply_odd_parity(offsetField);
-
-    rawPacket[2] = apply_odd_parity(utc_minute);
-    rawPacket[3] = apply_odd_parity(utc_hour);
-
-    /* 17-bit MJD spread across protocol bytes. */
-    rawPacket[4] = apply_odd_parity((mjd >> 9) & 0x7F); // Upper bits
-    rawPacket[5] = apply_odd_parity((mjd >> 2) & 0x7F); // Middle block
-    rawPacket[6] = apply_odd_parity(((mjd & 0x03) << 5) | 0x03);
-    rawPacket[7] = apply_odd_parity((mjd >> 14) & 0x07);
+    /* RDS CT packet: control byte + 4-byte RDS time stream from receiver */
+    rawPacket[0] = apply_odd_parity(0x47);              /* RDS Clock Time group identifier */
+    rawPacket[1] = apply_odd_parity(rds_time_block[0]); /* Offset/status byte */
+    rawPacket[2] = apply_odd_parity(rds_time_block[1]); /* Minute byte */
+    rawPacket[3] = apply_odd_parity(rds_time_block[2]); /* Hour byte */
+    rawPacket[4] = apply_odd_parity(rds_time_block[3]); /* MJD bits */
 
     esp_err_t ret = bus_start(cfg);
     if (ret != ESP_OK)
@@ -875,7 +856,7 @@ esp_err_t opel_mid_set_time(opel_mid_handle_t handle,
         return ret;
     }
 
-    ESP_LOGI(TAG, "Set time sync: mjd=%lu utc=%02u:%02u offset_half_hours=%d",
-             (unsigned long)mjd, utc_hour, utc_minute, local_offset_half_hours);
+    ESP_LOGI(TAG, "Set time sync: RDS bytes [0x%02X 0x%02X 0x%02X 0x%02X]",
+             rds_time_block[0], rds_time_block[1], rds_time_block[2], rds_time_block[3]);
     return ESP_OK;
 }
