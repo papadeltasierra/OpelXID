@@ -46,9 +46,6 @@ static const char *TAG = "opel_mid";
 /* Define for opel_mid10_send frame structure: address + data/mode bytes */
 #define OPEL_MID_RDS_FRAME_BYTES 11u /* Total data/mode bytes in RDS frame */
 
-/* Debug override: disable power-on line-state checks while keeping timing/pulses. */
-#define OPEL_MID_DEBUG_SKIP_POWER_ON_LEVEL_CHECKS 0u
-
 /* ── Device structure ─────────────────────────────────────────────────────── */
 
 struct opel_mid_dev_t
@@ -77,14 +74,6 @@ static esp_err_t expect_bus_levels(const opel_mid_config_t *cfg,
                                    int expected_mrq,
                                    const char *phase)
 {
-#if OPEL_MID_DEBUG_SKIP_POWER_ON_LEVEL_CHECKS
-    (void)cfg;
-    (void)expected_sda;
-    (void)expected_scl;
-    (void)expected_mrq;
-    (void)phase;
-    return ESP_OK;
-#else
     int sda = get_sda(cfg);
     int scl = get_scl(cfg);
     int mrq = get_mrq(cfg);
@@ -100,7 +89,6 @@ static esp_err_t expect_bus_levels(const opel_mid_config_t *cfg,
     }
 
     return ESP_OK;
-#endif
 }
 
 /* ── Parity ───────────────────────────────────────────────────────────────── */
@@ -791,7 +779,7 @@ esp_err_t opel_mid10_send(opel_mid_handle_t handle,
         return ret;
     }
 
-    /* 2. Data/mode bytes (11 bytes for RDS frame format) */
+    /* 2. Data/mode bytes */
     for (uint8_t i = 0u; i < OPEL_MID_RDS_FRAME_BYTES; i++)
     {
         ret = bus_send_byte_with_retry(cfg, data[i]);
