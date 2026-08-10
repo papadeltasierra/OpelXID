@@ -99,8 +99,8 @@ static esp_err_t expect_bus_levels(const opel_mid_config_t *cfg,
  * The bus uses 7-bit data + 1 parity bit (bit 0, LSB).
  * Odd parity: total number of 1-bits in the byte must be odd.
  *
- * @param data  Value with data in bits [7:1]; bit 0 is ignored.
- * @return      @p data with bit 0 set so that total 1-bit count is odd.
+ * @param data  Raw 7-bit value in bits [6:0].
+ * @return      Shifted 7-bit value in bits [7:1] with parity bit in bit 0.
  */
 static uint8_t apply_odd_parity(uint8_t data)
 {
@@ -682,8 +682,8 @@ esp_err_t opel_mid_send(opel_mid_handle_t handle,
         symbols->cd};
 
     /*
-     * Address byte: the 7-bit slave address is placed in bits[7:1].
-     * Parity will be applied by bus_send_byte_with_retry().
+     * Address byte: raw 7-bit slave address value in bits [6:0] (0x4A or 0x4D).
+     * Parity and shifting will be applied by bus_send_byte_with_retry().
      */
     uint8_t addr_byte = dev->addr;
 

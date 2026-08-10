@@ -44,25 +44,25 @@ extern "C"
 /* ── Symbol flags ─────────────────────────────────────────────────────────── */
 
 /** Radio Status byte (symbol byte 1) */
-#define OPEL_MID_SYM_COMMA (1u << 7)      /*!< Comma symbol            */
-#define OPEL_MID_SYM_RDS (1u << 6)        /*!< RDS symbol              */
-#define OPEL_MID_SYM_TP (1u << 5)         /*!< TP symbol               */
-#define OPEL_MID_SYM_STEREO (1u << 4)     /*!< Stereo symbol           */
-#define OPEL_MID_SYM_AS (1u << 2)         /*!< AS symbol               */
-#define OPEL_MID_SYM_TP_BRACKET (1u << 1) /*!< Bracket around TP       */
+#define OPEL_MID_SYM_COMMA (1u << 6)      /*!< Comma symbol            */
+#define OPEL_MID_SYM_RDS (1u << 5)        /*!< RDS symbol              */
+#define OPEL_MID_SYM_TP (1u << 4)         /*!< TP symbol               */
+#define OPEL_MID_SYM_STEREO (1u << 3)     /*!< Stereo symbol           */
+#define OPEL_MID_SYM_AS (1u << 1)         /*!< AS symbol               */
+#define OPEL_MID_SYM_TP_BRACKET (1u << 0) /*!< Bracket around TP       */
 
 /** Tape Status byte (symbol byte 2) */
-#define OPEL_MID_SYM_CD_IN (1u << 7)   /*!< CD-In symbol            */
-#define OPEL_MID_SYM_DOLBY_C (1u << 6) /*!< Dolby C symbol          */
-#define OPEL_MID_SYM_DOLBY_B (1u << 5) /*!< Dolby B symbol          */
-#define OPEL_MID_SYM_CR (1u << 4)      /*!< cr symbol               */
-#define OPEL_MID_SYM_CPS (1u << 3)     /*!< CPS symbol              */
+#define OPEL_MID_SYM_CD_IN (1u << 6)   /*!< CD-In symbol            */
+#define OPEL_MID_SYM_DOLBY_C (1u << 5) /*!< Dolby C symbol          */
+#define OPEL_MID_SYM_DOLBY_B (1u << 4) /*!< Dolby B symbol          */
+#define OPEL_MID_SYM_CR (1u << 3)      /*!< CR symbol               */
+#define OPEL_MID_SYM_CPS (1u << 2)     /*!< CPS symbol              */
 
 /** CD Status byte (symbol byte 3 – 10-digit displays only) */
-#define OPEL_MID_SYM_TRACK (1u << 6) /*!< Track symbol            */
-#define OPEL_MID_SYM_RDM (1u << 5)   /*!< RDM symbol              */
-#define OPEL_MID_SYM_PGM (1u << 4)   /*!< PGM symbol              */
-#define OPEL_MID_SYM_DISC (1u << 3)  /*!< DISC symbol             */
+#define OPEL_MID_SYM_TRACK (1u << 5) /*!< Track symbol            */
+#define OPEL_MID_SYM_RDM (1u << 4)   /*!< RDM symbol              */
+#define OPEL_MID_SYM_PGM (1u << 3)   /*!< PGM symbol              */
+#define OPEL_MID_SYM_DISC (1u << 2)  /*!< DISC symbol             */
 
     /**
      * @brief Symbol byte values for one display frame.
@@ -152,9 +152,14 @@ extern "C"
                             const char *text,
                             const opel_mid_symbols_t *symbols);
 
-    // !!PDS: Explain this.
     /**
-     * @brief Send a text frame to the display.
+     * @brief Send a raw data frame to the display (10-digit only).
+     *
+     * Allows direct transmission of pre-formatted data frames for
+     * specialized use cases. The frame must be 11 bytes total:
+     *   Byte 0:     Slave address (0x4D for 10-digit)
+     *   Bytes 1-3:  3 symbol bytes
+     *   Bytes 4-13: 10 data bytes (ASCII or other encoded values)
      *
      * The bus protocol follows the modified I2C scheme documented at
      * https://wiki.carluccio.de/index.php/Opel_TID :
@@ -162,15 +167,11 @@ extern "C"
      *   – MSB-first, 7 data bits + 1 odd parity bit per byte
      *   – Per-byte ACK; up to 3 retries on parity error before aborting
      *
-     * @p text is space-padded to the display width if shorter; characters
-     * beyond the display width are silently truncated.
-     *
-     * @param handle  Handle obtained from opel_mid_init().
-     * @param text    Null-terminated ASCII string.  Must not be NULL.
-     * @param symbols Symbol flags, or NULL to clear all symbols.
+     * @param handle Handle obtained from opel_mid_init().
+     * @param data   Pointer to raw frame data (11 bytes).
      *
      * @return ESP_OK              on success.
-     * @return ESP_ERR_INVALID_ARG if @p handle or @p text is NULL.
+     * @return ESP_ERR_INVALID_ARG if @p handle or @p data is NULL.
      * @return ESP_ERR_TIMEOUT     if the slave does not respond.
      */
     esp_err_t opel_mid10_send(opel_mid_handle_t handle,
