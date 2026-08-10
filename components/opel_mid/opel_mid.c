@@ -398,14 +398,13 @@ static esp_err_t bus_send_byte_with_retry(const opel_mid_config_t *cfg,
  * with a space.
  *
  * @param c  ASCII character.
- * @return   Raw byte with data in bits[7:1]; parity will be applied on send.
+ * @return   Raw 7-bit value; parity and shifting will be applied on send.
  */
 static uint8_t char_to_display_byte(char c)
 {
-    uint8_t ascii = ((uint8_t)c >= 0x20u && (uint8_t)c <= 0x7Eu)
-                        ? (uint8_t)c
-                        : 0x20u;
-    return (uint8_t)(ascii << 1u);
+    return ((uint8_t)c >= 0x20u && (uint8_t)c <= 0x7Eu)
+               ? (uint8_t)c
+               : 0x20u;
 }
 
 /* ── Public API ───────────────────────────────────────────────────────────── */
