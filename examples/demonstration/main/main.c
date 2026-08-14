@@ -38,6 +38,7 @@ static int s_time_initialized = 0;
 #define PIN_SDA CONFIG_OPEL_DISPLAY_PIN_SDA
 #define PIN_SCL CONFIG_OPEL_DISPLAY_PIN_SCL
 #define PIN_MRQ CONFIG_OPEL_DISPLAY_PIN_MRQ
+#define PIN_ANTENNA_POWER CONFIG_OPEL_DISPLAY_PIN_ANTENNA_POWER
 
 /* ── Character mapping table (Option 3) ───────────────────────────────────── */
 
@@ -1177,6 +1178,16 @@ void app_main(void)
 
     esp_err_t ret;
 
+    /* Configure antenna power pin as input to monitor radio status */
+    const gpio_config_t antenna_power_config = {
+        .pin_bit_mask = 1ULL << PIN_ANTENNA_POWER,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    ESP_ERROR_CHECK(gpio_config(&antenna_power_config));
+
     /* Initialize the display */
     opel_mid_config_t config = {
         .pin_sda = (gpio_num_t)PIN_SDA,
@@ -1199,8 +1210,26 @@ void app_main(void)
     printf("\nOpelXID MID/TID Demonstration Console\n");
     printf("======================================\n");
     printf("Display initialized.\n");
-    printf("Run 'power-on' when you want to execute the display power-on sequence.\n");
-    printf("Type 'help' to list commands, then run 'demo-info' for examples.\n\n");
+    printf("Waiting for antenna power to go high...\n\n");
+
+    /* Wait for antenna power line to go high */
+    while (gpio_get_level((gpio_num_t)PIN_ANTENNA_POWER) == 0)
+    {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    printf("Antenna power detected! Running power-on sequence...\n");
+    ret = opel_mid_power_on(s_display);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGW(TAG, "power-on sequence failed: 0x%X", ret);
+    }
+    else
+    {
+        printf("Power-on sequence completed successfully.\n");
+    }
+
+    printf("\nType 'help' to list commands.\n\n");
 
     start_console_repl();
 }

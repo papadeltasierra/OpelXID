@@ -46,4 +46,12 @@ config OPEL_DISPLAY_PIN_MRQ
         GPIO pin for MRQ (master request line).
         Must be open-drain capable.
 
+config OPEL_DISPLAY_PIN_ANTENNA_POWER
+    int "Antenna Power GPIO Pin"
+    default 19
+    range 0 39
+    help
+        GPIO pin for monitoring radio antenna power.
+        Used to detect when the radio is powered and ready.
+
 endmenu
