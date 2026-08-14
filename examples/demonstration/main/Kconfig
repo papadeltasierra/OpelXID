@@ -46,20 +46,4 @@ config OPEL_DISPLAY_PIN_MRQ
         GPIO pin for MRQ (master request line).
         Must be open-drain capable.
 
-config OPEL_DISPLAY_LEVEL_SHIFTER_OE_ENABLED
-    bool "Drive level shifter OE GPIO"
-    default n
-    help
-        Enable this if your level shifter's OE (output enable) pin is wired
-        to an ESP32 GPIO instead of being tied permanently high.
-
-config OPEL_DISPLAY_PIN_OE
-    int "OE (Output Enable) GPIO Pin"
-    default 18
-    range 0 39
-    depends on OPEL_DISPLAY_LEVEL_SHIFTER_OE_ENABLED
-    help
-        GPIO pin connected to the level shifter OE input.
-        The example drives this pin high before initializing the OpelMID library.
-
 endmenu

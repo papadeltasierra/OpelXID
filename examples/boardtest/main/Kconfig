@@ -21,17 +21,4 @@ config OPEL_BOARDTEST_PIN_MRQ
     help
         GPIO pin connected to MRQ channel of your level shifter / display harness.
 
-config OPEL_BOARDTEST_PIN_OE
-    int "OE GPIO Pin"
-    default 7
-    range 0 39
-    help
-        GPIO pin connected to the level shifter OE control.
-
-config OPEL_BOARDTEST_OE_ACTIVE_HIGH
-    bool "OE is active-high"
-    default y
-    help
-        Enable this when OE=1 enables the level shifter. Disable for active-low OE.
-
 endmenu

@@ -39,10 +39,6 @@ static int s_time_initialized = 0;
 #define PIN_SCL CONFIG_OPEL_DISPLAY_PIN_SCL
 #define PIN_MRQ CONFIG_OPEL_DISPLAY_PIN_MRQ
 
-#if CONFIG_OPEL_DISPLAY_LEVEL_SHIFTER_OE_ENABLED
-#define PIN_OE CONFIG_OPEL_DISPLAY_PIN_OE
-#endif
-
 /* ── Character mapping table (Option 3) ───────────────────────────────────── */
 
 /**
@@ -321,45 +317,6 @@ static int64_t epoch_seconds_from_ymdhms(int year, int month, int day, int hour,
     const int64_t days_since_epoch = (int64_t)era * 146097 + (int64_t)doe - 719468;
 
     return (days_since_epoch * 86400) + (hour * 3600) + (minute * 60) + second;
-}
-
-#if CONFIG_OPEL_DISPLAY_LEVEL_SHIFTER_OE_ENABLED
-static esp_err_t enable_level_shifter_oe(void)
-{
-    const gpio_config_t oe_config = {
-        .pin_bit_mask = 1ULL << PIN_OE,
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-
-    esp_err_t ret = gpio_config(&oe_config);
-    if (ret != ESP_OK)
-    {
-        return ret;
-    }
-
-    ret = gpio_set_level((gpio_num_t)PIN_OE, 1);
-    if (ret == ESP_OK)
-    {
-        ESP_LOGI(TAG, "Level shifter OE asserted on GPIO %d", PIN_OE);
-    }
-
-    return ret;
-}
-#endif
-
-/**
- * @brief Format a test string to fit the display width.
- */
-static void format_text(char *out, size_t max_len, const char *text, int width)
-{
-    memset(out, ' ', max_len);
-    size_t text_len = strlen(text);
-    size_t copy_len = (text_len < (size_t)width) ? text_len : width;
-    memcpy(out, text, copy_len);
-    out[width] = '\0';
 }
 
 /**
@@ -1053,18 +1010,7 @@ static int cmd_power_on(int argc, char **argv)
         return 1;
     }
 
-    char text[16];
-    int width = get_display_width(s_display_type);
-    format_text(text, sizeof(text), "READY!", width);
-
-    ret = opel_mid_send(s_display, text, NULL);
-    if (ret != ESP_OK)
-    {
-        printf("power-on completed, but sending READY! failed: 0x%X\n", ret);
-        return 1;
-    }
-
-    printf("power-on completed successfully. Sent: '%s'\n", text);
+    printf("power-on completed successfully.\n");
     return 0;
 }
 
@@ -1230,15 +1176,6 @@ void app_main(void)
     ESP_LOGI(TAG, "Starting OpelXID Demonstration");
 
     esp_err_t ret;
-
-#if CONFIG_OPEL_DISPLAY_LEVEL_SHIFTER_OE_ENABLED
-    ret = enable_level_shifter_oe();
-    if (ret != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Failed to enable level shifter OE: 0x%X", ret);
-        return;
-    }
-#endif
 
     /* Initialize the display */
     opel_mid_config_t config = {
