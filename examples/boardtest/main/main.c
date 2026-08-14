@@ -47,8 +47,7 @@ void app_main(void)
 
     ESP_LOGI(TAG,
              "Board test started. Pins: SDA=%d SCL=%d MRQ=%d",
-             PIN_SDA, PIN_SCL, PIN_MRQ
-    );
+             PIN_SDA, PIN_SCL, PIN_MRQ);
 
     while (1)
     {
