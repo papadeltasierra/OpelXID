@@ -38,7 +38,9 @@ static int s_time_initialized = 0;
 #define PIN_SDA CONFIG_OPEL_DISPLAY_PIN_SDA
 #define PIN_SCL CONFIG_OPEL_DISPLAY_PIN_SCL
 #define PIN_MRQ CONFIG_OPEL_DISPLAY_PIN_MRQ
+#if CONFIG_OPEL_DISPLAY_WAIT_FOR_ANTENNA_POWER
 #define PIN_ANTENNA_POWER CONFIG_OPEL_DISPLAY_PIN_ANTENNA_POWER
+#endif
 
 /* ── Character mapping table (Option 3) ───────────────────────────────────── */
 
@@ -1178,6 +1180,7 @@ void app_main(void)
 
     esp_err_t ret;
 
+#if CONFIG_OPEL_DISPLAY_WAIT_FOR_ANTENNA_POWER
     /* Configure antenna power pin as input to monitor radio status */
     const gpio_config_t antenna_power_config = {
         .pin_bit_mask = 1ULL << PIN_ANTENNA_POWER,
@@ -1187,6 +1190,7 @@ void app_main(void)
         .intr_type = GPIO_INTR_DISABLE,
     };
     ESP_ERROR_CHECK(gpio_config(&antenna_power_config));
+#endif
 
     /* Initialize the display */
     opel_mid_config_t config = {
@@ -1210,6 +1214,7 @@ void app_main(void)
     printf("\nOpelXID MID/TID Demonstration Console\n");
     printf("======================================\n");
     printf("Display initialized.\n");
+#if CONFIG_OPEL_DISPLAY_WAIT_FOR_ANTENNA_POWER
     printf("Waiting for antenna power to go high...\n\n");
 
     /* Wait for antenna power line to go high */
@@ -1228,6 +1233,7 @@ void app_main(void)
     {
         printf("Power-on sequence completed successfully.\n");
     }
+#endif
 
     printf("\nType 'help' to list commands.\n\n");
 
