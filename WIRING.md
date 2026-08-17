@@ -258,6 +258,72 @@ Decoupling capacitors are **critical for stable operation**. Place them close to
 - MID/TID protocol timing: 50µs minimum high/low period
 - **Conclusion**: Cable length is non-critical for this slow bus; lengths up to several meters should work. Verify with oscilloscope if you experience timing issues.
 
+## Alternative: Discrete Schmitt-Trigger Receive Buffer (Under Consideration)
+
+**Status**: Not yet adopted; documented here as an alternative to the TXS0108E level shifter
+for evaluation. Existing sections above remain the current recommended design until this is
+verified against real hardware.
+
+This approach separates the open-drain **drive** path from the **receive** path on each bus
+line, and adds Schmitt-trigger hysteresis to the receive path to resist oscillation/ringing on
+long cable runs — something a bidirectional auto-sensing shifter (TXS0108E) can be prone to.
+
+### Rationale
+
+- A true bidirectional Schmitt-trigger buffer does not exist as a single active gate; Schmitt
+  triggers are inherently directional (input → output).
+- The practical equivalent is: keep bus driving passive and open-drain (as today), but buffer
+  only the **receive** side through a Schmitt-trigger input for noise immunity.
+
+### Per-line topology (repeat for SDA, SCL, and MRQ)
+
+```
+Display side (5V)                              ESP32 side (3.3V)
+
+   Bus wire (SDA/SCL/MRQ) ──────┬───────────────┬──── to receive buffer input
+                                 │               │
+                          [10kΩ pull-up to 5V]   │
+   (display's own pull-up, already exists)       │
+                                 │               │
+                                 │        [22kΩ pull-down to GND]  ← divider, 5V→3.3V
+                                 │               │
+                                 │           Schmitt input (74HC14/74LVC14A)
+                                 │               │
+                                 │           GPIO (input mode, read here)
+                                 │
+   ESP32 drive (separate path, open-drain):
+   GPIO (output, open-drain) ──[small N-MOSFET or NPN, open-drain stage]── pulls wire low only
+```
+
+### Component values
+
+- **Schmitt buffer IC**: `74LVC14A` (3.3V-native hex inverting Schmitt trigger; requires
+  inverting the read logic in software) or `74HC14` with its VCC regulated to 3.3V for
+  non-inverted compatibility. One package (6 gates) covers all 3 lines with spares.
+- **Divider before the Schmitt input**: 22kΩ (top, to the 5V bus) / 33kΩ (bottom, to GND) —
+  gives roughly 3V at the bus-high level, safely within the 3.3V-rated Schmitt input's range
+  while still crossing its hysteresis band (typical `V_T+` ≈ 1.7V, `V_T-` ≈ 0.9V at 3.3V VCC).
+- **Drive path**: small N-channel MOSFET (e.g., BSS138) or NPN transistor, gate/base driven by
+  the ESP32 GPIO, drain/collector pulling the 5V bus line low. This stays separate from the
+  Schmitt buffer — Schmitt gates are unidirectional and must never be wired into the drive path.
+
+### Bidirectionality
+
+- The drive transistor and the receive divider/Schmitt tap are independent taps on the same
+  wire; the receive tap is high-impedance (tens of kΩ) and does not fight the drive transistor
+  or the display's pull-up.
+- When the ESP32 drives the line low, the receive path also reads that low (as with any
+  open-drain bus), which is useful for confirming a stuck-high fault.
+- When the ESP32 releases the line, the display's pull-up restores the 5V level, which the
+  receive path reads correctly through the divider/Schmitt input.
+
+### Open questions before adoption
+
+- Verify hysteresis thresholds against actual display drive strength and cable capacitance.
+- Confirm software can tolerate (or invert) an inverting Schmitt buffer if `74LVC14A` is used.
+- Bench-test against the existing TXS0108E design on a representative cable length before
+  replacing it in the primary wiring sections above.
+
 ### Serial Console (Optional)
 
 If your ESP32 lacks native USB UART (e.g., standard ESP32 or custom board):
